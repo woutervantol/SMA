@@ -1,0 +1,61 @@
+\documentclass[12pt]{article}
+\usepackage{siunitx}
+\usepackage{biblatex}
+\addbibresource{main.bib}
+\title{Explaining the two evolutionary tracks of open clusters by the initial gas density distribution} \author{R.\,S.~Dullaart \and R.\,J.\,R.~Rijnenberg \and W.\,W.\,M.~van~Tol} \date{\today}
+
+\begin{document} \maketitle
+
+\section*{Abstract}
+
+
+\section{Introduction}
+Open clusters are groups of about 100 to \num{10000} stars which are loosely bound by gravity.
+An open cluster forms stars from the same gas cloud and it's formation period is small enough compared to it's lifetime, that we can consider the ages, positions and composition of all stars in the cluster as approximately the same.
+Since the masses of the stars are different, the evolutionary stage of the cluster can be accurately determined.
+This means we can have a good idea of the shape of the Hertzsprung-Russel diagram (HRD) of open clusters and therefore accurately determine their metallicity and age.
+Apart from that, the HRDs can be used to obtain a measure for the gas extinction between the cluster and the observer.
+All in all they can be used to determine the structure of the Milky Way Galaxy.
+
+A problem with these measurements is that it that not all stars that form together end up in a cluster.
+We know for instance that many open clusters disband after formation and dissolve in the Galaxy.
+One of the reasons for this is that the stars in the cluster are blown away with the left over gas that was not used up in the star formation.
+Therefore the structure of the Milky Way constructed using open clusters is biased by the formation conditions of actually forming an open cluster.
+We are going to determine what efficiency in star formation is needed for an open cluster to stay bounded, or in other words determine the boundedness of open clusters as the ratio of stellar mass vs. gas mass in a newly formed cluster changes.
+
+
+
+
+\section{Methods}
+We will use AMUSE to model the evolution of our system. We will use the SPH code Fi to simulate the hydrodynamics of the gas which will be pushed away by the radiation from the stars. We chose an SPH code above a grid based code since we want to have infinite range for the gas to be blow away to. We chose Fi since it is also possible to do N-body simulations with Fi. We will use only 1000 stars so we do not need a tree code and since we are looking on effects on macro level we do not need strong precision. This means most codes would work for us and this allows us to use Fi for the N-body simulation as well. If it turns out to be better to use a separate N-body code we will use ph4 for the gravitational dynamics. 
+
+For the initial conditions we will assume a Plummer sphere distribution for the stars and the same distribution for the gas. The initial masses of the stars are chosen from a Saltpeter distribution. The gas around an open cluster is blown away in about \SI{1}{\mega yr}, so we will run our simulation for the same order of magnitude. The dissipating gas will be pushed by static potential based on the initial conditions of the stars.
+
+
+\section{Results}
+We expect to find some cutoff point which dictates if the cluster is still bound after a few Myrs. We expect this cutoff point to be when the mass of the gas is approximately equal to the total mass of the stars. If we have found a critical gas density at which this happens, we can expand the simulation by for instance including collisions or stellar evolution. We could also try to experiment with different gas distributions or initial mass distributions of the stars, or we can try to more accurately simulate the stellar winds. 
+
+% \section{Results}
+
+% \section{Discussion}
+
+% \section{Conclusions}
+
+% \section*{Acknowledgements}
+
+\printbibliography
+
+
+%\bibliographystyle{unsrt} \bibliography{bibtexfile}
+% Sources: 
+% https://en.wikipedia.org/wiki/Open_cluster
+% https://web.archive.org/web/20081222064251/http://seds.org/messier/open.html
+
+
+% Mogelijk:
+% https://www.researchgate.net/figure/Distributions-of-gas-and-stars-in-the-early-phase-of-the-star-cluster-formation-t-426_fig1_48191381
+% https://academic.oup.com/mnras/article/476/4/5341/4923098
+% https://iopscience.iop.org/article/10.1088/0004-637X/778/2/118#references
+% 
+\end{document}
+

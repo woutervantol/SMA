@@ -2,7 +2,7 @@ import numpy as np
 from amuse.units import (units, constants)
 from matplotlib import pyplot as plt
 from tqdm import tqdm
-
+import seaborn as sns
 
 
 n_stars = 1000
@@ -22,26 +22,31 @@ from amuse.ic.plummer import new_plummer_sphere
 bodies=new_plummer_sphere(n_stars, convert_nbody=converter)
 bodies.scale_to_standard(converter)
 
-# print(dir(bodies))
 
 
 from amuse.community.ph4.interface import ph4
 gravity = ph4(converter)
 gravity.particles.add_particles(bodies)
-print("gravitational energy: ", gravity.get_total_energy())
-print("kinetic energy: ", bodies.kinetic_energy)
+print("gravitational energy: ", bodies.potential_energy())
+print("kinetic energy: ", bodies.kinetic_energy())
 
 channel = gravity.particles.new_channel_to(bodies)
-
+print("print1")
 times = np.arange(0, 9, 1) | units.Myr
-figs, axes = plt.subplots(3, 3, sharex=True, sharey=True)
-axes = axes.flatten()
-import seaborn as sns
+print("print2")
+# figs, axes = plt.subplots(3, 3, sharex=True, sharey=True)
+print("print3")
+# axes = axes.flatten()
+print("print4")
+
+
 for i, t in enumerate(tqdm(times)):
     gravity.evolve_model(t)
     channel.copy()
     # sns.kdeplot(x=bodies.x.value_in(units.parsec), y=bodies.y.value_in(units.parsec), ax=axes[i])
-    axes[i].scatter(bodies.x.value_in(units.parsec), bodies.y.value_in(units.parsec), s=1, c=np.log(m_stars.value_in(units.MSun)))
+    plt.scatter(bodies.x.value_in(units.parsec), bodies.y.value_in(units.parsec), s=1, c=np.log(m_stars.value_in(units.MSun)))
+    print("gravitational energy: ", bodies.potential_energy())
+    print("kinetic energy: ", bodies.kinetic_energy())
     # plt.axis("equal")
-plt.show()
+    plt.show()
 gravity.stop()

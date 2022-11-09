@@ -1,6 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+from mpi4py import MPI
+
+comm = MPI.COMM_WORLD
+rank = comm.Get_rank()
+size = comm.Get_size()
+
+
+print(f"Hi, I'm proccessor {rank} out of {size}")
+
+
 from amuse.community.fi.interface import Fi
 from amuse.units import (units, constants)
 from amuse.couple import bridge
@@ -8,6 +18,7 @@ from amuse.ext.composition_methods import *
 from amuse.ext.orbital_elements import orbital_elements_from_binary
 from amuse.ext.protodisk import ProtoPlanetaryDisk
 from tqdm import tqdm
+import numpy as np
 
 ### TEST
 from amuse.ext.salpeter import new_salpeter_mass_distribution
@@ -32,10 +43,12 @@ r_cluster = 1.0 | units.parsec
 from amuse.units import nbody_system
 converter=nbody_system.nbody_to_si(m_stars.sum(),r_cluster)
 
+from amuse.community.ph4.interface import ph4
+gravity = ph4(converter)
 ### ENDTEST
-print("print 1")
+
+
 hydro = Fi(converter, mode='g6lib')
-print("print 2")
 hydro.parameters.use_hydro_flag = True
 hydro.parameters.radiation_flag = False
 hydro.parameters.gamma = 1
@@ -62,7 +75,7 @@ def gravity_hydro_bridge(gravity, hydro, gravhydro, bodies,
     gravity_initial_total_energy = gravity.get_total_energy() + hydro.get_total_energy()
     model_time = 0 | units.Myr
     dt = 0.012|units.yr  #1.0*Pinner
-    t_steps = np.arange(model_time, t_end, dt)
+    t_steps = np.arange(model_time.value_in(units.Myr), t_end.value_in(units.Myr), dt.value_in(units.Myr))
     print("print 5")
     for model_time in tqdm(t_steps):
         orbit_planet = orbital_elements_from_binary(bodies[:2], G=constants.G)

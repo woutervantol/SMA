@@ -43,6 +43,21 @@ bodies.scale_to_standard(converter)
 from amuse.community.ph4.interface import ph4
 gravity = ph4(converter)
 gravity.particles.add_particles(bodies)
+from amuse.ic.plummer import new_plummer_sphere
+bodies=new_plummer_sphere(n_stars, convert_nbody=converter)
+bodies.scale_to_standard(converter)
+
+## Maak gasdeeltjes
+#disc = ProtoPlanetaryDisk(n_stars,
+#                              convert_nbody=converter,
+#                              Rmin=0.01 | units.parsec,
+#                              Rmax=r_cluster,
+#                              q_out=10.0,
+#                              discfraction=0.01).result
+
+Ngas = 1000
+gas = new_plummer_gas_model(Ngas, convert_nbody=converter)
+### ENDTEST
 
 
 
@@ -59,15 +74,7 @@ hydro.parameters.eps_is_h_flag = False    # h_smooth is constant
 eps = 0.1 | units.au
 hydro.parameters.gas_epsilon = eps
 hydro.parameters.sph_h_const = eps
-
-
-Ngas = 1000
-gas = new_plummer_gas_model(Ngas, convert_nbody=converter)
 hydro.particles.add_particles(gas)
-# plt.scatter(gas.x.value_in(units.parsec), gas.y.value_in(units.parsec))
-# plt.show()
-
-
 
 gravhydro = bridge.Bridge(use_threading=False) #, method=SPLIT_4TH_S_M4)
 gravhydro.add_system(gravity, (hydro,))

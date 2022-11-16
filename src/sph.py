@@ -44,6 +44,21 @@ bodies.mass = m_stars
 from amuse.community.ph4.interface import ph4
 gravity = ph4(converter)
 gravity.particles.add_particles(bodies)
+from amuse.ic.plummer import new_plummer_sphere
+bodies=new_plummer_sphere(n_stars, convert_nbody=converter)
+bodies.scale_to_standard(converter)
+
+## Maak gasdeeltjes
+#disc = ProtoPlanetaryDisk(n_stars,
+#                              convert_nbody=converter,
+#                              Rmin=0.01 | units.parsec,
+#                              Rmax=r_cluster,
+#                              q_out=10.0,
+#                              discfraction=0.01).result
+
+Ngas = 1000
+gas = new_plummer_gas_model(Ngas, convert_nbody=converter)
+### ENDTEST
 
 
 
@@ -104,8 +119,9 @@ def gravity_hydro_bridge(gravity, hydro, gravhydro, bodies,
     dt = 0.1|units.Myr  #1.0*Pinner
 
     t_steps = np.arange(model_time.value_in(units.Myr), t_end.value_in(units.Myr), dt.value_in(units.Myr)) | units.Myr
-
-    for t in tqdm(t_steps):
+    fig, ax = plt.subplots(3, 3)
+    ax = ax.flatten()
+    for i, t in enumerate(tqdm(t_steps)):
         dE_gravity = gravity_initial_total_energy/(gravity.get_total_energy()+hydro.get_total_energy())
         print(dE_gravity, t)
         gravhydro.evolve_model(t)
@@ -115,14 +131,15 @@ def gravity_hydro_bridge(gravity, hydro, gravhydro, bodies,
         # print("gravitational energy: ", bodies.potential_energy())
         # print("kinetic energy: ", bodies.kinetic_energy())
         print( - bodies.potential_energy() / bodies.kinetic_energy())
-        plt.scatter(gas.x.value_in(units.parsec), gas.y.value_in(units.parsec), s=1)
-        plt.scatter(bodies.x.value_in(units.parsec), bodies.y.value_in(units.parsec), s=1, c=np.log(m_stars.value_in(units.MSun)))
-        plt.scatter(bodies[0].x.value_in(units.parsec), bodies[0].y.value_in(units.parsec), s=5, c="red")
-        plt.show()
+        if i < 91 and i%10:
+            ax[i//10].scatter(gas.x.value_in(units.parsec), gas.y.value_in(units.parsec), s=1)
+            ax[i//10].scatter(bodies.x.value_in(units.parsec), bodies.y.value_in(units.parsec), s=1, c=np.log(m_stars.value_in(units.MSun)))
+            ax[i//10].scatter(bodies[0].x.value_in(units.parsec), bodies[0].y.value_in(units.parsec), s=5, c="red")
+    plt.show()
 
     gravity.stop()
     hydro.stop()
 
-t_end = 1.0 | units.Myr
+t_end = 10.0 | units.Myr
 gravity_hydro_bridge(gravity, hydro, gravhydro, 
                      bodies, t_end)

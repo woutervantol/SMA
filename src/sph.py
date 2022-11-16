@@ -10,19 +10,19 @@ size = comm.Get_size()
 
 print(f"Hi, I'm proccessor {rank} out of {size}")
 
-
-from amuse.community.fi.interface import Fi
-from amuse.units import (units, constants)
-from amuse.couple import bridge
-# from amuse.ext.composition_methods import *
-from amuse.ext.orbital_elements import orbital_elements_from_binary
-from amuse.lab import new_plummer_gas_model
-from amuse.lab import new_plummer_sphere
-from tqdm import tqdm
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
+from amuse.community.fi.interface import Fi
+from amuse.community.ph4.interface import ph4
+from amuse.couple import bridge
+from amuse.ext.orbital_elements import orbital_elements_from_binary
 from amuse.ext.salpeter import new_salpeter_mass_distribution
 from amuse.ext import stellar_wind
+from amuse.ic.plummer import new_plummer_sphere
+from amuse.lab import (new_plummer_gas_model, new_plummer_sphere)
+from amuse.units import (units, constants, nbody_system)
+from tqdm import tqdm
+
 
 #create stars with masses, positions and velocities and put them in the ph4 module
 n_stars = 1000
@@ -33,20 +33,14 @@ total_mass = np.sum(m_stars)
 print(total_mass)
 r_cluster = 1.0 | units.parsec
 #converter is nodig omdat het anders dimensieloos is, nu kunnen we initial conditions in SI ingeven
-from amuse.units import nbody_system
 converter=nbody_system.nbody_to_si(m_stars.sum(),r_cluster)
 
-from amuse.ic.plummer import new_plummer_sphere
+gravity = ph4(converter)
+gravity.particles.add_particles(bodies)
 bodies=new_plummer_sphere(n_stars, convert_nbody=converter)
 bodies.scale_to_standard(converter)
 bodies.mass = m_stars
 
-from amuse.community.ph4.interface import ph4
-gravity = ph4(converter)
-gravity.particles.add_particles(bodies)
-from amuse.ic.plummer import new_plummer_sphere
-bodies=new_plummer_sphere(n_stars, convert_nbody=converter)
-bodies.scale_to_standard(converter)
 
 ## Maak gasdeeltjes
 #disc = ProtoPlanetaryDisk(n_stars,

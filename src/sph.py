@@ -22,7 +22,7 @@ from tqdm import tqdm
 import numpy as np
 import matplotlib.pyplot as plt
 from amuse.ext.salpeter import new_salpeter_mass_distribution
-
+from amuse.ext import stellar_wind
 
 #create stars with masses, positions and velocities and put them in the ph4 module
 n_stars = 1000
@@ -39,6 +39,7 @@ converter=nbody_system.nbody_to_si(m_stars.sum(),r_cluster)
 from amuse.ic.plummer import new_plummer_sphere
 bodies=new_plummer_sphere(n_stars, convert_nbody=converter)
 bodies.scale_to_standard(converter)
+bodies.mass = m_stars
 
 from amuse.community.ph4.interface import ph4
 gravity = ph4(converter)
@@ -46,7 +47,7 @@ gravity.particles.add_particles(bodies)
 
 
 
-#create a gas distribution and put it in the hydro code
+#create a hydro code and a gas distribution and put the gas in the hydro code
 hydro = Fi(converter, mode='g6lib')
 hydro.parameters.use_hydro_flag = True
 hydro.parameters.radiation_flag = False
@@ -61,14 +62,29 @@ hydro.parameters.gas_epsilon = eps
 hydro.parameters.sph_h_const = eps
 
 
-Ngas = 1000
-gas = new_plummer_gas_model(Ngas, convert_nbody=converter)
+Ngas = 10000
+gas = new_plummer_gas_model(Ngas, convert_nbody=converter) #Note: this is virialized gas, so it has velocities
 hydro.particles.add_particles(gas)
-# plt.scatter(gas.x.value_in(units.parsec), gas.y.value_in(units.parsec))
-# plt.show()
+
+supernova_gas_velocity = 12.9 | units.kms
+SNstar = bodies[np.argmax(bodies.mass)]
+NSNgas = 1000
+SNconverter = nbody_system.nbody_to_si(SNstar.mass, 1|units.RSun)
+SNgas = new_plummer_gas_model(NSNgas, SNconverter)
+#TODO: voeg toe velocities (of u) in de radial direction
+print(dir(SNgas))
+print(SNgas.u)
+
+# print(bodies.mass)
+# SNstar = bodies[np.argmax(bodies.mass)]
+# print(SNstar.mass)
+# NSNgas = 1000
+# SNgas = stellar_wind.new_stellar_wind(SNstar.mass, target_gas=gas, timestep=0)
+
+# print(SNgas)
 
 
-
+#bridge the codes
 gravhydro = bridge.Bridge(use_threading=False) #, method=SPLIT_4TH_S_M4)
 gravhydro.add_system(gravity, (hydro,))
 gravhydro.add_system(hydro, (gravity,))

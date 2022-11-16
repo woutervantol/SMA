@@ -1,6 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+from mpi4py import MPI
+
+comm = MPI.COMM_WORLD
+rank = comm.Get_rank()
+size = comm.Get_size()
+
+
+print(f"Hi, I'm proccessor {rank} out of {size}")
+
+
 from amuse.community.fi.interface import Fi
 from amuse.units import (units, constants)
 from amuse.couple import bridge

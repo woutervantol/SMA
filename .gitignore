@@ -10,3 +10,6 @@
 # Python
 __pycache__/
 activate
+
+# Amuse
+_amuse_output_data/

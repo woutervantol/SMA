@@ -35,11 +35,12 @@ r_cluster = 1.0 | units.parsec
 #converter is nodig omdat het anders dimensieloos is, nu kunnen we initial conditions in SI ingeven
 converter=nbody_system.nbody_to_si(m_stars.sum(),r_cluster)
 
-gravity = ph4(converter)
-gravity.particles.add_particles(bodies)
 bodies=new_plummer_sphere(n_stars, convert_nbody=converter)
 bodies.scale_to_standard(converter)
 bodies.mass = m_stars
+gravity = ph4(converter)
+gravity.particles.add_particles(bodies)
+
 
 
 ## Maak gasdeeltjes

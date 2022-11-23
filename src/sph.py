@@ -53,23 +53,6 @@ gravity.particles.add_particles(bodies)
 
 
 ## Maak gasdeeltjes
-#disc = ProtoPlanetaryDisk(n_stars,
-supernova_gas_velocity = 12.9 | units.kms
-NSNgas = 1000
-SNconverter = nbody_system.nbody_to_si(SNstar.mass, 1|units.RSun)
-SNgas = new_plummer_gas_model(NSNgas, SNconverter)
-
-centre = np.average(SNgas.position.value_in(units.m), axis=0)|units.m
-rdir = SNgas.position - centre
-dirnorm = np.sqrt(SNgas.x.value_in(units.m)**2 + SNgas.y.value_in(units.m)**2 + SNgas.z.value_in(units.m)**2)
-SNgas.velocity = rdir / (dirnorm[:,np.newaxis]|units.m) * supernova_gas_velocity
-hydro.particles.add_particles(SNgas)
-#                              convert_nbody=converter,
-#                              Rmin=0.01 | units.parsec,
-#                              Rmax=r_cluster,
-#                              q_out=10.0,
-#                              discfraction=0.01).result
-
 Ngas = 1000
 gas = new_plummer_gas_model(Ngas, convert_nbody=converter)
 ### ENDTEST
@@ -130,7 +113,6 @@ def gravity_hydro_bridge(gravity, hydro, gravhydro, bodies, t_end):
         gravhydro.evolve_model(t)
         channel["to_stars"].copy()
         channel["to_gas"].copy()
-        channel["to_SNgas"].copy()
 
         # print("gravitational energy: ", bodies.potential_energy())
         # print("kinetic energy: ", bodies.kinetic_energy())
@@ -139,7 +121,7 @@ def gravity_hydro_bridge(gravity, hydro, gravhydro, bodies, t_end):
             ax[i].scatter(gas.x.value_in(units.parsec), gas.y.value_in(units.parsec), s=1)
             ax[i].scatter(bodies.x.value_in(units.parsec), bodies.y.value_in(units.parsec), s=1)#, c=np.log(m_stars.value_in(units.MSun)))
 
-            ax2[i].scatter(SNgas.x.value_in(units.parsec), SNgas.y.value_in(units.parsec), s=1)
+            # ax2[i].scatter(SNgas.x.value_in(units.parsec), SNgas.y.value_in(units.parsec), s=1)
             ax[i].scatter(bodies[np.argmax(bodies.mass)].x.value_in(units.parsec), bodies[np.argmax(bodies.mass)].y.value_in(units.parsec), s=5, c="red")
         if i == 8:
             break

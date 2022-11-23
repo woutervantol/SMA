@@ -34,6 +34,9 @@ from amuse.community.seba.interface import SeBa
 seeds = [112, 134, 216, 275, 309, 317, 458, 596, 661, 775, 836, 848, 873, 930, 939]
 np.random.seed(seeds[np.random.randint(0, len(seeds))]) #take random seed from valid seeds
 
+def create_cheese(gas, stars, r):
+    cheesegas = gas.select(lambda gaspos: ((stars.position-gaspos).lengths()<r).any(),["position"])
+    return gas.difference(cheesegas)
 
 #create stars with masses, positions and velocities and put them in the ph4 module
 n_stars = 1000
@@ -53,9 +56,16 @@ gravity.particles.add_particles(bodies)
 
 
 ## Maak gasdeeltjes
-Ngas = 1000
+Ngas = 10000
 gas = new_plummer_gas_model(Ngas, convert_nbody=converter)
-### ENDTEST
+
+# fig = plt.figure()
+# ax = fig.add_subplot(projection='3d')
+# ax.scatter(gas.x.value_in(units.parsec), gas.y.value_in(units.parsec), gas.z.value_in(units.parsec), s=1)
+gas = create_cheese(gas, bodies, 0.6 | units.parsec)
+# ax.scatter(gas.x.value_in(units.parsec), gas.y.value_in(units.parsec), gas.z.value_in(units.parsec), s=1)
+# ax.scatter(bodies.x.value_in(units.parsec), bodies.y.value_in(units.parsec), bodies.z.value_in(units.parsec), s=4, color="black")
+plt.show()
 
 
 

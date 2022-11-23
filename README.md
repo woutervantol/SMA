@@ -20,6 +20,7 @@ Simulate a open cluster with the following points implemented:
 ## Points of improvement
 - [ ] Use MESA for the stellar evolution code
 - [ ] Tweak the star formation efficiency 
+- [ ] Make the plummer sphere radius much bigger, how does this impact the results?
 
 ---
 ## Contributors:

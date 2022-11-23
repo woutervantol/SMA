@@ -14,7 +14,7 @@ Simulate a open cluster with the following points implemented:
   - [ ] Use 10000 sph particles
   - [ ] Time step 1kyr - 100kyr
 
-## Research question:
+## Research question
 > What is the contribution of the supernova to clearing the gas from a newly formed cluster?
 
 ## Points of improvement

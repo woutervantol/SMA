@@ -82,6 +82,10 @@ NSNgas = 1000
 SNconverter = nbody_system.nbody_to_si(SNstar.mass, 1|units.RSun)
 SNgas = new_plummer_gas_model(NSNgas, SNconverter)
 #TODO: voeg toe velocities (of u) in de radial direction
+
+norm = np.sqrt(SNgas.vx**2 + SNgas.vy**2 + SNgas.vz**2)
+
+
 print(dir(SNgas))
 print(SNgas.u)
 

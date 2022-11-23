@@ -22,6 +22,13 @@ from amuse.ic.plummer import new_plummer_sphere
 from amuse.lab import (new_plummer_gas_model, new_plummer_sphere)
 from amuse.units import (units, constants, nbody_system)
 from tqdm import tqdm
+from amuse.community.fractalcluster.interface import new_fractal_cluster_model
+from amuse.community.seba.interface import SeBa
+
+# Toevoegen:
+# - Channel van stellar winds
+# - Channel van stellar evolution
+# - 
 
 
 #create stars with masses, positions and velocities and put them in the ph4 module
@@ -35,7 +42,7 @@ r_cluster = 1.0 | units.parsec
 #converter is nodig omdat het anders dimensieloos is, nu kunnen we initial conditions in SI ingeven
 converter=nbody_system.nbody_to_si(m_stars.sum(),r_cluster)
 
-bodies=new_plummer_sphere(n_stars, convert_nbody=converter)
+bodies=new_fractal_cluster_model(n_stars,fractal_dimension= 1.6, convert_nbody=converter)
 bodies.scale_to_standard(converter)
 bodies.mass = m_stars
 gravity = ph4(converter)
@@ -53,6 +60,10 @@ gravity.particles.add_particles(bodies)
 Ngas = 1000
 gas = new_plummer_gas_model(Ngas, convert_nbody=converter)
 ### ENDTEST
+
+# Stellar evolution
+evolution = SeBa()
+evolution.particles.add_particles(bodies)
 
 
 

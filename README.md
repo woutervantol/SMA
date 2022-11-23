@@ -8,3 +8,8 @@ Is the gas blown away by the stellar winds or by the supernova?
 What is the contribution of the supernova to clearing the gas?
 present 14th december, deadline is 23rd of december
 see if the swiss cheese approach is realistic
+
+Contributors:
+Rick Dullaart ()
+Wouter van Tol ()
+Rutger Rijnenberg (s1829777)

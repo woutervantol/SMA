@@ -61,9 +61,7 @@ Ngas = 1000
 gas = new_plummer_gas_model(Ngas, convert_nbody=converter)
 ### ENDTEST
 
-# Stellar evolution
-evolution = SeBa()
-evolution.particles.add_particles(bodies)
+
 
 
 
@@ -86,18 +84,21 @@ hydro.parameters.sph_h_const = eps
 Ngas = 10000
 gas = new_plummer_gas_model(Ngas, convert_nbody=converter) #Note: this is virialized gas, so it has velocities
 hydro.particles.add_particles(gas)
+Mgas = np.sum(gas.mass)
+mgas = Mgas/Ngas
 
-supernova_gas_velocity = 12.9 | units.kms
-SNstar = bodies[np.argmax(bodies.mass)]
-NSNgas = 1000
-SNconverter = nbody_system.nbody_to_si(SNstar.mass, 1|units.RSun)
-SNgas = new_plummer_gas_model(NSNgas, SNconverter)
+# Over supernova gas ; kan worden verwijderd
+#supernova_gas_velocity = 12.9 | units.kms
+#SNstar = bodies[np.argmax(bodies.mass)]
+#NSNgas = 1000
+#SNconverter = nbody_system.nbody_to_si(SNstar.mass, 1|units.RSun)
+#SNgas = new_plummer_gas_model(NSNgas, SNconverter)
 
-centre = np.average(SNgas.position.value_in(units.m), axis=0)|units.m
-rdir = SNgas.position - centre
-dirnorm = np.sqrt(SNgas.x.value_in(units.m)**2 + SNgas.y.value_in(units.m)**2 + SNgas.z.value_in(units.m)**2)
-SNgas.velocity = rdir / (dirnorm[:,np.newaxis]|units.m) * supernova_gas_velocity
-hydro.particles.add_particles(SNgas)
+#centre = np.average(SNgas.position.value_in(units.m), axis=0)|units.m
+#rdir = SNgas.position - centre
+#dirnorm = np.sqrt(SNgas.x.value_in(units.m)**2 + SNgas.y.value_in(units.m)**2 + SNgas.z.value_in(units.m)**2)
+#SNgas.velocity = rdir / (dirnorm[:,np.newaxis]|units.m) * supernova_gas_velocity
+#hydro.particles.add_particles(SNgas)
 
 #bridge the codes
 gravhydro = bridge.Bridge(use_threading=False) #, method=SPLIT_4TH_S_M4)
@@ -109,9 +110,35 @@ channel = {"from_stars": bodies.new_channel_to(gravity.particles),
             "to_stars": gravity.particles.new_channel_to(bodies),
             "from_gas": gas.new_channel_to(hydro.particles),
             "to_gas": hydro.particles.new_channel_to(gas),
-            "from_SNgas": SNgas.new_channel_to(hydro.particles),
-            "to_SNgas": hydro.particles.new_channel_to(SNgas)}
+            #"from_SNgas": SNgas.new_channel_to(hydro.particles),
+            #"to_SNgas": hydro.particles.new_channel_to(SNgas)
+            }
+            
+# Stellar evolution
+evolution = SeBa()
+evolution.particles.add_particles(bodies)
+ch_e2g = evolution.particles.new_channel_to(gravity.particles)
+ch_g2e = gravity.particles.new_channel_to(bodies)
+ch_e2b = evolution.particles.new_channel_to(bodies)
+ch_e2b.copy()
         
+
+# Stellar wind  p. 223
+from amuse.ext.stellar_wind import new_stellar_wind
+dt = 0.1|units.Myr  #1.0*Pinner     # Gekopieerd uit gravity_hydro_bridge()
+wind = new_stellar_wind(mgas, target_gas=gas, timestep=dt, derive_from_evolution=True)
+wind.particles.add_particles(bodies)
+channel_to_wind = bodies.new_channel_to(wind.particles)
+
+# # Stellar wind (p.214-216 in book)
+# n_wind = 10000
+# from amuse.lab import Particles
+# wind_gas = Particles(n_wind)
+# wind_gas.mass = 
+# # give_particles_some_properties(new_gas)
+# gas.add_particles(wind_gas)
+# gas.synchronize_to(hydro.gas)
+
 
 def gravity_hydro_bridge(gravity, hydro, gravhydro, bodies, t_end):
 
@@ -127,24 +154,35 @@ def gravity_hydro_bridge(gravity, hydro, gravhydro, bodies, t_end):
     for i, t in enumerate(tqdm(t_steps)):
         dE_gravity = gravity_initial_total_energy/(gravity.get_total_energy()+hydro.get_total_energy())
         print(dE_gravity, t)
+        evolution.evolve_model(t)
+
+        channel_to_wind.copy()      # wind with hydro and grav: Book 8.1.1 p.323
+        
+        wind.evolve_model(t)
+        #gas.synchronize_to(hydro.gas)
+        ch_e2g.copy()
+        ch_e2b.copy()        
         gravhydro.evolve_model(t)
         channel["to_stars"].copy()
         channel["to_gas"].copy()
-        channel["to_SNgas"].copy()
+        #channel["to_SNgas"].copy()
+        
 
         # print("gravitational energy: ", bodies.potential_energy())
         # print("kinetic energy: ", bodies.kinetic_energy())
         print( - bodies.potential_energy() / bodies.kinetic_energy())
+        print("Total mass:", np.sum(bodies.mass) | units.MSun)
         if i < 91:# and i%10==0:
             ax[i].scatter(gas.x.value_in(units.parsec), gas.y.value_in(units.parsec), s=1)
             ax[i].scatter(bodies.x.value_in(units.parsec), bodies.y.value_in(units.parsec), s=1)#, c=np.log(m_stars.value_in(units.MSun)))
 
-            ax2[i].scatter(SNgas.x.value_in(units.parsec), SNgas.y.value_in(units.parsec), s=1)
+            #ax2[i].scatter(SNgas.x.value_in(units.parsec), SNgas.y.value_in(units.parsec), s=1)
             ax[i].scatter(bodies[np.argmax(bodies.mass)].x.value_in(units.parsec), bodies[np.argmax(bodies.mass)].y.value_in(units.parsec), s=5, c="red")
         if i == 8:
             break
     plt.show()
-
+    
+    evolution.stop()
     gravity.stop()
     hydro.stop()
 

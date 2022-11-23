@@ -42,7 +42,6 @@ gravity = ph4(converter)
 gravity.particles.add_particles(bodies)
 
 
-
 ## Maak gasdeeltjes
 #disc = ProtoPlanetaryDisk(n_stars,
 #                              convert_nbody=converter,
@@ -72,6 +71,7 @@ hydro.parameters.gas_epsilon = eps
 hydro.parameters.sph_h_const = eps
 
 
+
 Ngas = 10000
 gas = new_plummer_gas_model(Ngas, convert_nbody=converter) #Note: this is virialized gas, so it has velocities
 hydro.particles.add_particles(gas)
@@ -81,22 +81,12 @@ SNstar = bodies[np.argmax(bodies.mass)]
 NSNgas = 1000
 SNconverter = nbody_system.nbody_to_si(SNstar.mass, 1|units.RSun)
 SNgas = new_plummer_gas_model(NSNgas, SNconverter)
-#TODO: voeg toe velocities (of u) in de radial direction
 
-norm = np.sqrt(SNgas.vx**2 + SNgas.vy**2 + SNgas.vz**2)
-
-
-print(dir(SNgas))
-print(SNgas.u)
-
-# print(bodies.mass)
-# SNstar = bodies[np.argmax(bodies.mass)]
-# print(SNstar.mass)
-# NSNgas = 1000
-# SNgas = stellar_wind.new_stellar_wind(SNstar.mass, target_gas=gas, timestep=0)
-
-# print(SNgas)
-
+centre = np.average(SNgas.position.value_in(units.m), axis=0)|units.m
+rdir = SNgas.position - centre
+dirnorm = np.sqrt(SNgas.x.value_in(units.m)**2 + SNgas.y.value_in(units.m)**2 + SNgas.z.value_in(units.m)**2)
+SNgas.velocity = rdir / (dirnorm[:,np.newaxis]|units.m) * supernova_gas_velocity
+hydro.particles.add_particles(SNgas)
 
 #bridge the codes
 gravhydro = bridge.Bridge(use_threading=False) #, method=SPLIT_4TH_S_M4)
@@ -107,11 +97,12 @@ gravhydro.add_system(hydro, (gravity,))
 channel = {"from_stars": bodies.new_channel_to(gravity.particles),
             "to_stars": gravity.particles.new_channel_to(bodies),
             "from_gas": gas.new_channel_to(hydro.particles),
-            "to_gas": hydro.particles.new_channel_to(gas)}
+            "to_gas": hydro.particles.new_channel_to(gas),
+            "from_SNgas": SNgas.new_channel_to(hydro.particles),
+            "to_SNgas": hydro.particles.new_channel_to(SNgas)}
         
 
-def gravity_hydro_bridge(gravity, hydro, gravhydro, bodies,
-                         t_end):
+def gravity_hydro_bridge(gravity, hydro, gravhydro, bodies, t_end):
 
     gravity_initial_total_energy = gravity.get_total_energy() + hydro.get_total_energy()
     model_time = 0 | units.Myr
@@ -119,21 +110,28 @@ def gravity_hydro_bridge(gravity, hydro, gravhydro, bodies,
 
     t_steps = np.arange(model_time.value_in(units.Myr), t_end.value_in(units.Myr), dt.value_in(units.Myr)) | units.Myr
     fig, ax = plt.subplots(3, 3)
+    fig2, ax2 = plt.subplots(3, 3)
     ax = ax.flatten()
+    ax2 = ax2.flatten()
     for i, t in enumerate(tqdm(t_steps)):
         dE_gravity = gravity_initial_total_energy/(gravity.get_total_energy()+hydro.get_total_energy())
         print(dE_gravity, t)
         gravhydro.evolve_model(t)
         channel["to_stars"].copy()
         channel["to_gas"].copy()
+        channel["to_SNgas"].copy()
 
         # print("gravitational energy: ", bodies.potential_energy())
         # print("kinetic energy: ", bodies.kinetic_energy())
         print( - bodies.potential_energy() / bodies.kinetic_energy())
-        if i < 91 and i%10:
-            ax[i//10].scatter(gas.x.value_in(units.parsec), gas.y.value_in(units.parsec), s=1)
-            ax[i//10].scatter(bodies.x.value_in(units.parsec), bodies.y.value_in(units.parsec), s=1, c=np.log(m_stars.value_in(units.MSun)))
-            ax[i//10].scatter(bodies[0].x.value_in(units.parsec), bodies[0].y.value_in(units.parsec), s=5, c="red")
+        if i < 91:# and i%10==0:
+            ax[i].scatter(gas.x.value_in(units.parsec), gas.y.value_in(units.parsec), s=1)
+            ax[i].scatter(bodies.x.value_in(units.parsec), bodies.y.value_in(units.parsec), s=1)#, c=np.log(m_stars.value_in(units.MSun)))
+
+            ax2[i].scatter(SNgas.x.value_in(units.parsec), SNgas.y.value_in(units.parsec), s=1)
+            ax[i].scatter(bodies[np.argmax(bodies.mass)].x.value_in(units.parsec), bodies[np.argmax(bodies.mass)].y.value_in(units.parsec), s=5, c="red")
+        if i == 8:
+            break
     plt.show()
 
     gravity.stop()

@@ -51,7 +51,7 @@ SNstar = bodies[np.argmax(bodies.mass)]
 gravity = ph4(converter)
 gravity.particles.add_particles(bodies)
 
-
+"""
 ## Maak gasdeeltjes
 #disc = ProtoPlanetaryDisk(n_stars,
 supernova_gas_velocity = 12.9 | units.kms
@@ -73,7 +73,7 @@ hydro.particles.add_particles(SNgas)
 Ngas = 1000
 gas = new_plummer_gas_model(Ngas, convert_nbody=converter)
 ### ENDTEST
-
+"""
 
 
 
@@ -164,6 +164,11 @@ def gravity_hydro_bridge(gravity, hydro, gravhydro, bodies, t_end):
         channel["to_stars"].copy()
         channel["to_gas"].copy()
         #channel["to_SNgas"].copy()
+
+        current_gasmass = np.sum(gas.mass)
+        print("Total mass of gas:", current_gasmass)
+        current_gasnumber = current_gasmass/mgas
+        print("# of gass particles:", current_gasnumber)
         
 
         # print("gravitational energy: ", bodies.potential_energy())

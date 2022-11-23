@@ -30,27 +30,40 @@ from amuse.community.seba.interface import SeBa
 # - Channel van stellar evolution
 # - 
 
+#seeds for which the highest mass star has mass m with:  29.5Msun < m < 30.5MSun
+seeds = [112, 134, 216, 275, 309, 317, 458, 596, 661, 775, 836, 848, 873, 930, 939]
+np.random.seed(seeds[np.random.randint(0, len(seeds))]) #take random seed from valid seeds
+
 
 #create stars with masses, positions and velocities and put them in the ph4 module
 n_stars = 1000
 alpha_IMF = -2.35
-
 m_stars = new_salpeter_mass_distribution(n_stars, 0.1|units.MSun, 100|units.MSun, alpha_IMF)
 total_mass = np.sum(m_stars)
-print(total_mass)
+
 r_cluster = 1.0 | units.parsec
-#converter is nodig omdat het anders dimensieloos is, nu kunnen we initial conditions in SI ingeven
 converter=nbody_system.nbody_to_si(m_stars.sum(),r_cluster)
 
 bodies=new_fractal_cluster_model(n_stars,fractal_dimension= 1.6, convert_nbody=converter)
 bodies.scale_to_standard(converter)
 bodies.mass = m_stars
+SNstar = bodies[np.argmax(bodies.mass)]
 gravity = ph4(converter)
 gravity.particles.add_particles(bodies)
 
 
 ## Maak gasdeeltjes
 #disc = ProtoPlanetaryDisk(n_stars,
+supernova_gas_velocity = 12.9 | units.kms
+NSNgas = 1000
+SNconverter = nbody_system.nbody_to_si(SNstar.mass, 1|units.RSun)
+SNgas = new_plummer_gas_model(NSNgas, SNconverter)
+
+centre = np.average(SNgas.position.value_in(units.m), axis=0)|units.m
+rdir = SNgas.position - centre
+dirnorm = np.sqrt(SNgas.x.value_in(units.m)**2 + SNgas.y.value_in(units.m)**2 + SNgas.z.value_in(units.m)**2)
+SNgas.velocity = rdir / (dirnorm[:,np.newaxis]|units.m) * supernova_gas_velocity
+hydro.particles.add_particles(SNgas)
 #                              convert_nbody=converter,
 #                              Rmin=0.01 | units.parsec,
 #                              Rmax=r_cluster,
@@ -87,17 +100,6 @@ Ngas = 10000
 gas = new_plummer_gas_model(Ngas, convert_nbody=converter) #Note: this is virialized gas, so it has velocities
 hydro.particles.add_particles(gas)
 
-supernova_gas_velocity = 12.9 | units.kms
-SNstar = bodies[np.argmax(bodies.mass)]
-NSNgas = 1000
-SNconverter = nbody_system.nbody_to_si(SNstar.mass, 1|units.RSun)
-SNgas = new_plummer_gas_model(NSNgas, SNconverter)
-
-centre = np.average(SNgas.position.value_in(units.m), axis=0)|units.m
-rdir = SNgas.position - centre
-dirnorm = np.sqrt(SNgas.x.value_in(units.m)**2 + SNgas.y.value_in(units.m)**2 + SNgas.z.value_in(units.m)**2)
-SNgas.velocity = rdir / (dirnorm[:,np.newaxis]|units.m) * supernova_gas_velocity
-hydro.particles.add_particles(SNgas)
 
 #bridge the codes
 gravhydro = bridge.Bridge(use_threading=False) #, method=SPLIT_4TH_S_M4)
@@ -108,9 +110,7 @@ gravhydro.add_system(hydro, (gravity,))
 channel = {"from_stars": bodies.new_channel_to(gravity.particles),
             "to_stars": gravity.particles.new_channel_to(bodies),
             "from_gas": gas.new_channel_to(hydro.particles),
-            "to_gas": hydro.particles.new_channel_to(gas),
-            "from_SNgas": SNgas.new_channel_to(hydro.particles),
-            "to_SNgas": hydro.particles.new_channel_to(SNgas)}
+            "to_gas": hydro.particles.new_channel_to(gas)}
         
 
 def gravity_hydro_bridge(gravity, hydro, gravhydro, bodies, t_end):

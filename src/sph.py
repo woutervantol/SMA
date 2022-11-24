@@ -34,6 +34,9 @@ from amuse.community.seba.interface import SeBa
 seeds = [112, 134, 216, 275, 309, 317, 458, 596, 661, 775, 836, 848, 873, 930, 939]
 np.random.seed(seeds[np.random.randint(0, len(seeds))]) #take random seed from valid seeds
 
+def create_cheese(gas, stars, r):
+    cheesegas = gas.select(lambda gaspos: ((stars.position-gaspos).lengths()<r).any(),["position"])
+    return gas.difference(cheesegas)
 
 #create stars with masses, positions and velocities and put them in the ph4 module
 n_stars = 1000

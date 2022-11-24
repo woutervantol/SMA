@@ -12,6 +12,7 @@ print(f"Hi, I'm proccessor {rank} out of {size}")
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 from amuse.community.fi.interface import Fi
 from amuse.community.ph4.interface import ph4
 from amuse.couple import bridge
@@ -43,7 +44,7 @@ n_stars = 1000
 alpha_IMF = -2.35
 m_stars = new_salpeter_mass_distribution(n_stars, 0.1|units.MSun, 100|units.MSun, alpha_IMF)
 total_mass = np.sum(m_stars)
-
+print("max mass star:", m_stars[np.argmax(m_stars)])
 r_cluster = 1.0 | units.parsec
 converter=nbody_system.nbody_to_si(m_stars.sum(),r_cluster)
 
@@ -54,29 +55,19 @@ SNstar = bodies[np.argmax(bodies.mass)]
 gravity = ph4(converter)
 gravity.particles.add_particles(bodies)
 
-"""
+
 ## Maak gasdeeltjes
-#disc = ProtoPlanetaryDisk(n_stars,
-supernova_gas_velocity = 12.9 | units.kms
-NSNgas = 1000
-SNconverter = nbody_system.nbody_to_si(SNstar.mass, 1|units.RSun)
-SNgas = new_plummer_gas_model(NSNgas, SNconverter)
-
-centre = np.average(SNgas.position.value_in(units.m), axis=0)|units.m
-rdir = SNgas.position - centre
-dirnorm = np.sqrt(SNgas.x.value_in(units.m)**2 + SNgas.y.value_in(units.m)**2 + SNgas.z.value_in(units.m)**2)
-SNgas.velocity = rdir / (dirnorm[:,np.newaxis]|units.m) * supernova_gas_velocity
-hydro.particles.add_particles(SNgas)
-#                              convert_nbody=converter,
-#                              Rmin=0.01 | units.parsec,
-#                              Rmax=r_cluster,
-#                              q_out=10.0,
-#                              discfraction=0.01).result
-
-Ngas = 1000
+Ngas = 10000
 gas = new_plummer_gas_model(Ngas, convert_nbody=converter)
-### ENDTEST
-"""
+
+# fig = plt.figure()
+# ax = fig.add_subplot(projection='3d')
+# ax.scatter(gas.x.value_in(units.parsec), gas.y.value_in(units.parsec), gas.z.value_in(units.parsec), s=1)
+gas = create_cheese(gas, bodies, 0.6 | units.parsec)
+# ax.scatter(gas.x.value_in(units.parsec), gas.y.value_in(units.parsec), gas.z.value_in(units.parsec), s=1)
+# ax.scatter(bodies.x.value_in(units.parsec), bodies.y.value_in(units.parsec), bodies.z.value_in(units.parsec), s=4, color="black")
+# plt.show()
+
 
 
 
@@ -151,13 +142,14 @@ def gravity_hydro_bridge(gravity, hydro, gravhydro, bodies, t_end):
     dt = 0.1|units.Myr  #1.0*Pinner
 
     t_steps = np.arange(model_time.value_in(units.Myr), t_end.value_in(units.Myr), dt.value_in(units.Myr)) | units.Myr
+    print("t_steps:", t_steps)
     fig, ax = plt.subplots(3, 3)
-    fig2, ax2 = plt.subplots(3, 3)
+ #   fig2, ax2 = plt.subplots(3, 3)
     ax = ax.flatten()
-    ax2 = ax2.flatten()
+ #   ax2 = ax2.flatten()
     for i, t in enumerate(tqdm(t_steps)):
         dE_gravity = gravity_initial_total_energy/(gravity.get_total_energy()+hydro.get_total_energy())
-        print(dE_gravity, t)
+        print("dE:", dE_gravity, "; t=", t)
         evolution.evolve_model(t)
         channel_to_wind.copy()      # wind with hydro and grav: Book 8.1.1 p.323
         wind.evolve_model(t)
@@ -173,25 +165,57 @@ def gravity_hydro_bridge(gravity, hydro, gravhydro, bodies, t_end):
         current_gasnumber = current_gasmass/mgas
         print("# of gass particles:", current_gasnumber)
         
+        bodies_pd = pd.DataFrame(np.array(bodies.stellar_type.number), columns=["stellar_type"])
+        print("\n", bodies_pd.value_counts(), "\n")
 
         # print("gravitational energy: ", bodies.potential_energy())
         # print("kinetic energy: ", bodies.kinetic_energy())
-        print( - bodies.potential_energy() / bodies.kinetic_energy())
+        print("-Ep/Ek:", - bodies.potential_energy() / bodies.kinetic_energy())
         print("Total mass:", np.sum(bodies.mass) | units.MSun)
-        if i < 91:# and i%10==0:
+        if i < 9:#1:# and i%10==0:
             ax[i].scatter(gas.x.value_in(units.parsec), gas.y.value_in(units.parsec), s=1)
             ax[i].scatter(bodies.x.value_in(units.parsec), bodies.y.value_in(units.parsec), s=1)#, c=np.log(m_stars.value_in(units.MSun)))
 
-            #ax2[i].scatter(SNgas.x.value_in(units.parsec), SNgas.y.value_in(units.parsec), s=1)
+            # ax2[i].scatter(SNgas.x.value_in(units.parsec), SNgas.y.value_in(units.parsec), s=1)
             ax[i].scatter(bodies[np.argmax(bodies.mass)].x.value_in(units.parsec), bodies[np.argmax(bodies.mass)].y.value_in(units.parsec), s=5, c="red")
-        if i == 8:
-            break
+        #if i == 8:     #Weggecomment om een supernova te vinden.
+            #break
     plt.show()
     
     evolution.stop()
     gravity.stop()
     hydro.stop()
 
-t_end = 10.0 | units.Myr
+t_end = 50.0 | units.Myr
 gravity_hydro_bridge(gravity, hydro, gravhydro, 
                      bodies, t_end)
+
+
+
+
+
+# Interessant boek? https://misaladino.com/wp-content/uploads/2019/11/Thesis_Martha_Irene.pdf
+
+#### Stellar types ####
+""" 
+"deeply or fully convective low mass MS star",  # 0
+        "Main Sequence star",  # 1
+        "Hertzsprung Gap",  # 2
+        "First Giant Branch",  # 3
+        "Core Helium Burning",  # 4
+        "First Asymptotic Giant Branch",  # 5
+        "Second Asymptotic Giant Branch",  # 6
+        "Main Sequence Naked Helium star",  # 7
+        "Hertzsprung Gap Naked Helium star",  # 8
+        "Giant Branch Naked Helium star",  # 9
+        "Helium White Dwarf",  # 10
+        "Carbon/Oxygen White Dwarf",  # 11
+        "Oxygen/Neon White Dwarf",  # 12
+        "Neutron Star",  # 13
+        "Black Hole",  # 14
+        "Massless Supernova",  # 15
+        "Unknown stellar type",  # 16
+        "Pre-main-sequence Star",  # 17
+        "Planet",  # 18
+        "Brown Dwarf",  # 19
+"""        

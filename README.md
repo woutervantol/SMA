@@ -3,15 +3,15 @@
 Simulate a open cluster with the following points implemented:
 - Simulate the stars:
   - [x] Generate 1000 stars from a Salpeter IMF.
-  - [ ] Tune the most massive star to be 30 Msun.
+  - [/] Tune the most massive star to be 30 Msun.
   - [x] Distribute the stars in a fractal distribution.
 - Simulate the gas:
   - [x] Distribute the gas in a Plummer sphere.
-  - [ ] Remove the gas around the stars (create a Swiss cheese)
+  - [/] Remove the gas around the stars (create a Swiss cheese), based on the mass of the stars.
 - Stellar winds and Supernovae:
   - [x] Add stellar evolution (SEBA)
-  - [ ] Implement stellar winds module
-  - [ ] Use 10000 sph particles
+  - [x?] Implement stellar winds module
+  - [x] Use 10000 sph particles
   - [ ] Time step 1kyr - 100kyr
 
 ## Research question

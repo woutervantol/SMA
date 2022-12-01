@@ -42,9 +42,11 @@ n_stars = 10    # 1000
 alpha_IMF = -2.35
 m_stars = new_salpeter_mass_distribution(n_stars, 0.1|units.MSun, 100|units.MSun, alpha_IMF)
 total_mass = np.sum(m_stars)
+
 #
 m_stars[np.argmax(m_stars)] = 30 | units.MSun   # Added so we have a massive star for other n_stars
 #
+
 print("max mass star:", m_stars[np.argmax(m_stars)])
 r_cluster = 1.0 | units.parsec
 converter=nbody_system.nbody_to_si(m_stars.sum(),r_cluster)
@@ -58,7 +60,7 @@ gravity.particles.add_particles(bodies)
 
 
 ## Maak gasdeeltjes
-Ngas = 100  # 10000
+Ngas = 1000  # 10000
 gas = new_plummer_gas_model(Ngas, convert_nbody=converter)
 
 # fig = plt.figure()
@@ -80,7 +82,7 @@ hydro.parameters.radiation_flag = False
 hydro.parameters.gamma = 1
 hydro.parameters.isothermal_flag = True
 hydro.parameters.integrate_entropy_flag = False
-# hydro.parameters.timestep = 0.01 | units.Myr
+hydro.parameters.timestep = dt
 hydro.parameters.verbosity = 0
 hydro.parameters.eps_is_h_flag = False    # h_smooth is constant
 eps = 0.1 | units.au
@@ -151,15 +153,20 @@ def ninestepplot(bodies, gas, i, t, maintitle, savename, fig, ax, fig_complete):
     return fig, ax, fig_complete
 
 def simulate(gravity, hydro, gravhydro, evolution, wind, channel, bodies, gas, t):
-    evolution.evolve_model(t)
-    channel["stars_to_wind"].copy()      # wind with hydro and grav: Book 8.1.1 p.323
-    wind.evolve_model(t)               
+    evolution.evolve_model(t)    
     channel["evo_to_grav"].copy()
     channel["evo_to_stars"].copy()
-    # wind.particles.synchronize_to(hydro.particles)
-    # gas.synchronize_to(hydro.particles) # was eerst hydro.gas ------> controleren
-    gas.synchronize_to(hydro.particles) # Dit klopt volgens mij, maar zorgt wel voor een uiteindelijke crash: navragen
-                                            # amuse.support.exceptions.AmuseException: Error when calling 'get_position' of a 'Fi', errorcode is -1
+
+    channel["stars_to_wind"].copy()      # wind with hydro and grav: Book 8.1.1 p.323
+    wind.evolve_model(t)
+    gas.synchronize_to(hydro.particles)  # Deze code zou moeten kloppen, maar zorgt wel voor een uiteindelijke crash: navragen
+                                            # Crash: "amuse.support.exceptions.AmuseException: Error when calling 'get_position' of a 'Fi', errorcode is -1"
+    # print(dir(gas))
+    # print(dir(gas[-1]))
+    # print("velocity of gas:", np.sqrt((gas.vx)**2+(gas.vy)**2+(gas.vz)**2))
+    # if gas[-1] != gas[99]:
+    #    print("Positions:", gas.x[100])
+
     gravhydro.evolve_model(t)
     channel["to_stars"].copy()
     channel["to_gas"].copy()
@@ -216,6 +223,7 @@ def gravity_hydro_bridge(gravity, hydro, gravhydro, evolution, wind, channel, bo
             fig, ax, fig_complete = ninestepplot(bodies, gas, i, t, "Cluster after supernova", "Replace_after_supernova.png", fig, ax, fig_complete)
         if (i>2000) & (i<2010):
             fig, ax, fig_complete = ninestepplot(bodies, gas, i-2001, t, "Cluster longer after supernova", "Replace_longer_after_supernova.png", fig, ax, fig_complete)
+
         dE_gravity = gravity_initial_total_energy/(gravity.get_total_energy()+hydro.get_total_energy())
         print("dE:", dE_gravity, "; t=", t)
         current_gasmass = np.sum(gas.mass)

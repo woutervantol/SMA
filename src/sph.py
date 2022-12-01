@@ -31,7 +31,7 @@ from amuse.community.seba.interface import SeBa
 # - 
 
 #seeds for which the highest mass star has mass m with:  29.5Msun < m < 30.5MSun
-seeds = [112, 134, 216, 275, 309, 317, 458, 596, 661, 775, 836, 848, 873, 930, 939]
+seeds = np.array([112, 134, 216, 275, 309, 317, 458, 596, 661, 775, 836, 848, 873, 930, 939])
 np.random.seed(seeds[np.random.randint(0, len(seeds))]) #take random seed from valid seeds
 
 
@@ -56,9 +56,6 @@ gravity.particles.add_particles(bodies)
 Ngas = 1000
 gas = new_plummer_gas_model(Ngas, convert_nbody=converter)
 ### ENDTEST
-
-
-
 
 
 #create a hydro code and a gas distribution and put the gas in the hydro code

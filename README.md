@@ -12,7 +12,9 @@ Simulate a open cluster with the following points implemented:
   - [x] Add stellar evolution (SEBA)
   - [x?] Implement stellar winds module
   - [x] Use 10000 sph particles
-  - [ ] Time step 1kyr - 100kyr
+  - [ ] Time step 1kyr - 100kyr when the 30MSun star goes supernova
+- Cool stuff:
+  - [ ] Make movie of simulation
 
 ## Research question
 > What is the contribution of the supernova to clearing the gas from a newly formed cluster?

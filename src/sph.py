@@ -30,7 +30,7 @@ dt = 0.2 | units.Myr
 dt_bridge = 0.1 | units.Myr  #1.0*Pinner
 
 #seeds for which the highest mass star has mass m with:  29.5Msun < m < 30.5MSun
-seeds = [112, 134, 216, 275, 309, 317, 458, 596, 661, 775, 836, 848, 873, 930, 939]
+seeds = np.array([112, 134, 216, 275, 309, 317, 458, 596, 661, 775, 836, 848, 873, 930, 939])
 np.random.seed(seeds[np.random.randint(0, len(seeds))]) #take random seed from valid seeds
 
 def create_cheese(gas, stars, r):
@@ -70,9 +70,6 @@ gas = create_cheese(gas, bodies, 0.6 | units.parsec) # Gasdeeltjes weghalen op b
 # ax.scatter(gas.x.value_in(units.parsec), gas.y.value_in(units.parsec), gas.z.value_in(units.parsec), s=1)
 # ax.scatter(bodies.x.value_in(units.parsec), bodies.y.value_in(units.parsec), bodies.z.value_in(units.parsec), s=4, color="black")
 # plt.show()
-
-
-
 
 
 #create a hydro code and a gas distribution and put the gas in the hydro code

@@ -19,6 +19,12 @@ Simulate a open cluster with the following points implemented:
 ## Research question
 > What is the contribution of the supernova to clearing the gas from a newly formed cluster?
 
+## Intermediate errors to fix
+- [ ] de Fi error met code -1
+- [ ] De initializatie positie van gasdeeltjes door stellar winds
+- [ ] gatenkaas beter maken
+- [ ] timesteps verbeteren, timesteps van bridge kan max 0.5 keer de totale zijn en stellar evolution heeft eigen timestep, dus die roep je niet aan
+
 ## Points of improvement
 - [ ] Use MESA for the stellar evolution code
 - [ ] Tweak the star formation efficiency 

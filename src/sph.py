@@ -1,15 +1,5 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-
-from mpi4py import MPI
-
-comm = MPI.COMM_WORLD
-rank = comm.Get_rank()
-size = comm.Get_size()
-
-
-print(f"Hi, I'm proccessor {rank} out of {size}")
-
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -26,26 +16,30 @@ from tqdm import tqdm
 from amuse.community.fractalcluster.interface import new_fractal_cluster_model
 from amuse.community.seba.interface import SeBa
 
-dt = 0.2 | units.Myr
-dt_bridge = 0.1 | units.Myr  #1.0*Pinner
 
-#seeds for which the highest mass star has mass m with:  29.5Msun < m < 30.5MSun
-seeds = np.array([112, 134, 216, 275, 309, 317, 458, 596, 661, 775, 836, 848, 873, 930, 939])
-np.random.seed(seeds[np.random.randint(0, len(seeds))]) #take random seed from valid seeds
+dt = 0.1 | units.Myr
+dt_winds = 0.05 | units.Myr
+dt_hydro = 0.01 | units.Myr
+dt_bridge = 0.05 | units.Myr  #1.0*Pinner
+
 
 def create_cheese(gas, stars, r):
     cheesegas = gas.select(lambda gaspos: ((stars.position-gaspos).lengths()<r).any(),["position"])
     return gas.difference(cheesegas)    # Testcode hiervan ook opslaan in github! Kunnen ze ook naar kijken. Aanpassen op basis van massa ster (eerst lage massas kazen)
 
+
 #create stars with masses, positions and velocities and put them in the ph4 module
-n_stars = 10    # 1000
+n_stars = 10
 alpha_IMF = -2.35
-m_stars = new_salpeter_mass_distribution(n_stars, 0.1|units.MSun, 100|units.MSun, alpha_IMF)
+while True:
+    m_stars = new_salpeter_mass_distribution(n_stars, 0.1|units.MSun, 100|units.MSun, alpha_IMF)
+    masslist = np.sort(m_stars)
+    if masslist[-1].value_in(units.MSun) > 27 and masslist[-1].value_in(units.MSun) < 33 and masslist[-2].value_in(units.MSun) < 27:
+        break
 total_mass = np.sum(m_stars)
-#
-m_stars[np.argmax(m_stars)] = 30 | units.MSun   # Added so we have a massive star for other n_stars
-#
 print("max mass star:", m_stars[np.argmax(m_stars)])
+
+
 r_cluster = 1.0 | units.parsec
 converter=nbody_system.nbody_to_si(m_stars.sum(),r_cluster)
 
@@ -72,17 +66,16 @@ gas = create_cheese(gas, bodies, 0.6 | units.parsec) # Gasdeeltjes weghalen op b
 
 #create a hydro code and a gas distribution and put the gas in the hydro code
 hydro = Fi(converter, mode='g6lib')
-hydro.parameters.use_hydro_flag = True
-hydro.parameters.radiation_flag = False
 hydro.parameters.gamma = 1
 hydro.parameters.isothermal_flag = True
 hydro.parameters.integrate_entropy_flag = False
-# hydro.parameters.timestep = 0.01 | units.Myr
+hydro.parameters.timestep = dt_hydro
 hydro.parameters.verbosity = 0
 hydro.parameters.eps_is_h_flag = False    # h_smooth is constant
 eps = 0.1 | units.au
 hydro.parameters.gas_epsilon = eps
 hydro.parameters.sph_h_const = eps
+
 
 # Ngas = 10000
 # gas = new_plummer_gas_model(Ngas, convert_nbody=converter) #Note: this is virialized gas, so it has velocities
@@ -96,7 +89,9 @@ gravhydro = bridge.Bridge(use_threading=False) #, method=SPLIT_4TH_S_M4)
 gravhydro.add_system(gravity, (hydro,))
 gravhydro.add_system(hydro, (gravity,))
 gravhydro.timestep = dt_bridge # min 2x de output timestep
-            
+
+
+
 # Stellar evolution
 evolution = SeBa()
 evolution.particles.add_particles(bodies)
@@ -104,13 +99,14 @@ ch_e2g = evolution.particles.new_channel_to(gravity.particles)
 ch_g2e = gravity.particles.new_channel_to(bodies) # Unnecessary?
 ch_e2b = evolution.particles.new_channel_to(bodies)
 ch_e2b.copy()
-        
+
+
 
 # Stellar wind  p. 223
 from amuse.ext.stellar_wind import new_stellar_wind
-wind = new_stellar_wind(mgas, target_gas=gas, timestep=dt, derive_from_evolution=True)
+wind = new_stellar_wind(mgas, target_gas=gas, timestep=dt_winds, derive_from_evolution=True)
 wind.particles.add_particles(bodies)
-channel_to_wind = bodies.new_channel_to(wind.particles)
+
 
 channel = {"from_stars": bodies.new_channel_to(gravity.particles),
             "to_stars": gravity.particles.new_channel_to(bodies),
@@ -118,17 +114,8 @@ channel = {"from_stars": bodies.new_channel_to(gravity.particles),
             "to_gas": hydro.particles.new_channel_to(gas),
             "evo_to_grav": evolution.particles.new_channel_to(gravity.particles),
             "evo_to_stars": evolution.particles.new_channel_to(bodies),
-            "stars_to_wind": channel_to_wind
+            "stars_to_wind": bodies.new_channel_to(wind.particles)
             }
-
-# # Stellar wind (p.214-216 in book)
-# n_wind = 10000
-# from amuse.lab import Particles
-# wind_gas = Particles(n_wind)
-# wind_gas.mass = 
-# # give_particles_some_properties(new_gas)
-# gas.add_particles(wind_gas)
-# gas.synchronize_to(hydro.gas)
 
 def ninestepplot(bodies, gas, i, t, maintitle, savename, fig, ax, fig_complete):
     if fig_complete == True:
@@ -138,7 +125,7 @@ def ninestepplot(bodies, gas, i, t, maintitle, savename, fig, ax, fig_complete):
         fig_complete = False
     if i < 9:
         ax[i].scatter(gas.x.value_in(units.parsec), gas.y.value_in(units.parsec), s=1)
-        ax[i].scatter(bodies.x.value_in(units.parsec), bodies.y.value_in(units.parsec), s=1)#, c=np.log(m_stars.value_in(units.MSun)))
+        ax[i].scatter(bodies.x.value_in(units.parsec), bodies.y.value_in(units.parsec), s=1)
         ax[i].scatter(bodies[np.argmax(bodies.mass)].x.value_in(units.parsec), bodies[np.argmax(bodies.mass)].y.value_in(units.parsec), s=5, c="red")
         ax[i].set_title('t = '+str(t))
     if i == 8:
@@ -147,83 +134,102 @@ def ninestepplot(bodies, gas, i, t, maintitle, savename, fig, ax, fig_complete):
         plt.show()
     return fig, ax, fig_complete
 
+def onestepplot():
+    plt.scatter(gas.x.value_in(units.parsec), gas.y.value_in(units.parsec), s=1, label="gas")
+    plt.scatter(bodies.x.value_in(units.parsec), bodies.y.value_in(units.parsec), s=1, label="stars")
+    plt.scatter(bodies[np.argmax(bodies.mass)].x.value_in(units.parsec), bodies[np.argmax(bodies.mass)].y.value_in(units.parsec), s=5, c="red")
+    plt.legend()
+    plt.xlim(-5, 5)
+    plt.ylim(-5, 5)
+    plt.xlabel("parsec")
+    plt.ylabel("parsec")
+    plt.show()
+
+def star_control(bodies, n_stars):
+        bodies_pd = pd.DataFrame(np.array(bodies.stellar_type.number), columns=["stellar_type"])
+        # print("\n", bodies_pd.value_counts(), "\n")
+        # if int(bodies_pd.value_counts().loc[1]) < n_stars:
+        #     if list(bodies_pd.value_counts().index[1]) == [14]: 
+        #         print("Black holes:", int(bodies_pd.value_counts().loc[14]))
+        #     if list(bodies_pd.value_counts().index[1]) == [4]: 
+        #         print("Core helium burning stars:", int(bodies_pd.value_counts().loc[4]))
+        return list(bodies_pd.value_counts().index[-1])[0]
+
+def delete_outofbounds():
+    mask = gas.position.lengths() >= 1e19|units.m
+    selection = gas[mask]
+    gas.remove_particles(selection)
+
+
 def simulate(gravity, hydro, gravhydro, evolution, wind, channel, bodies, gas, t):
     evolution.evolve_model(t)
-    channel["stars_to_wind"].copy()      # wind with hydro and grav: Book 8.1.1 p.323
-    wind.evolve_model(t)               
+    wind.evolve_model(t)
     channel["evo_to_grav"].copy()
     channel["evo_to_stars"].copy()
-    # wind.particles.synchronize_to(hydro.particles)
-    # gas.synchronize_to(hydro.particles) # was eerst hydro.gas ------> controleren
+    channel["stars_to_wind"].copy()      # wind with hydro and grav: Book 8.1.1 p.323
     gas.synchronize_to(hydro.particles) # Dit klopt volgens mij, maar zorgt wel voor een uiteindelijke crash: navragen
-                                            # amuse.support.exceptions.AmuseException: Error when calling 'get_position' of a 'Fi', errorcode is -1
-    gravhydro.evolve_model(t)
+    gravhydro.evolve_model(t)   
+    delete_outofbounds()
     channel["to_stars"].copy()
     channel["to_gas"].copy()
     return gravity, hydro, gravhydro, evolution, wind, bodies, gas
 
-def star_control(bodies, n_stars):
-        bodies_pd = pd.DataFrame(np.array(bodies.stellar_type.number), columns=["stellar_type"])
-        print("\n", bodies_pd.value_counts(), "\n")
-        if int(bodies_pd.value_counts().loc[1]) < n_stars:
-            if list(bodies_pd.value_counts().index[1]) == [14]: 
-                print("Black holes:", int(bodies_pd.value_counts().loc[14]))
-            if list(bodies_pd.value_counts().index[1]) == [4]: 
-                print("Core helium burning stars:", int(bodies_pd.value_counts().loc[4]))
-        return list(bodies_pd.value_counts().index[-1])[0]
 
 def gravity_hydro_bridge(gravity, hydro, gravhydro, evolution, wind, channel, bodies, gas, t_end, dt, dt_bridge, n_stars):
     gravity_initial_total_energy = gravity.get_total_energy() + hydro.get_total_energy()
     model_time = 0 | units.Myr
     dt_SN = 0.001 | units.Myr
-    
+
     t_steps = np.arange(model_time.value_in(units.Myr), t_end.value_in(units.Myr), dt.value_in(units.Myr)) | units.Myr
     t_steps_coderen = np.concatenate((t_steps[:1], t_steps[28:]), axis=None)    # Voor snelheid coderen
 
     fig_complete = True
     fig, ax = False, False
+    onestepplot()
     for i, t in enumerate(tqdm(t_steps)):
         gravity, hydro, gravhydro, evolution, wind, bodies, gas = simulate(gravity, hydro, gravhydro, evolution, wind, channel, bodies, gas, t)
-        if i < 9:
-            fig, ax, fig_complete = ninestepplot(bodies, gas, i, t, "Cluster at initialization", "Replace_initialization.png", fig, ax, fig_complete)
-
+        # if i < 9:
+        #     fig, ax, fig_complete = ninestepplot(bodies, gas, i, t, "Cluster at initialization", "Replace_initialization.png", fig, ax, fig_complete)
+        
         dE_gravity = gravity_initial_total_energy/(gravity.get_total_energy()+hydro.get_total_energy())
-        print("dE:", dE_gravity, "; t=", t)
+        # print("dE:", dE_gravity, "; t=", t)
         current_gasmass = np.sum(gas.mass)
         if i == 0:
             start_mass = current_gasmass
-        print("Mass change in stars:", current_gasmass-start_mass)
+        # print("Mass change in stars:", current_gasmass-start_mass)
 
-        print("Total mass of gas:", current_gasmass)
+        # print("Total mass of gas:", current_gasmass)
         current_gasnumber = current_gasmass/mgas        
-        print("# of gass particles:", current_gasnumber)
-        print("-Ep/Ek:", - bodies.potential_energy() / bodies.kinetic_energy())
-        print("Total mass:", np.sum(bodies.mass) | units.MSun)
+        # print("# of gass particles:", current_gasnumber)
+        # print("-Ep/Ek:", - bodies.potential_energy() / bodies.kinetic_energy())
+        # print("Total mass:", np.sum(bodies.mass) | units.MSun)
 
         most_advanced_type = star_control(bodies, n_stars)
-        print("MAT:", most_advanced_type)
+        # print("MAT:", most_advanced_type)
         if most_advanced_type == 14:
             t_SN = t
+            onestepplot()
             break
     
     t_steps_supernova = np.arange(t_SN.value_in(units.Myr), t_end.value_in(units.Myr), dt_SN.value_in(units.Myr)) | units.Myr
     for i, t in enumerate(tqdm(t_steps_supernova)):
         gravity, hydro, gravhydro, evolution, wind, bodies, gas = simulate(gravity, hydro, gravhydro, evolution, wind, channel, bodies, gas, t)
-        if i < 9:
-            fig, ax, fig_complete = ninestepplot(bodies, gas, i, t, "Cluster after supernova", "Replace_after_supernova.png", fig, ax, fig_complete)
+        # if i < 9:
+        #     fig, ax, fig_complete = ninestepplot(bodies, gas, i, t, "Cluster after supernova", "Replace_after_supernova.png", fig, ax, fig_complete)
+        
         if (i>2000) & (i<2010):
             fig, ax, fig_complete = ninestepplot(bodies, gas, i-2001, t, "Cluster longer after supernova", "Replace_longer_after_supernova.png", fig, ax, fig_complete)
         dE_gravity = gravity_initial_total_energy/(gravity.get_total_energy()+hydro.get_total_energy())
-        print("dE:", dE_gravity, "; t=", t)
+        # print("dE:", dE_gravity, "; t=", t)
         current_gasmass = np.sum(gas.mass)
-        print("Total mass of gas:", current_gasmass)
+        # print("Total mass of gas:", current_gasmass)
         current_gasnumber = current_gasmass/mgas        
-        print("# of gass particles:", current_gasnumber)
-        print("-Ep/Ek:", - bodies.potential_energy() / bodies.kinetic_energy())
-        print("Total mass:", np.sum(bodies.mass) | units.MSun)
+        # print("# of gass particles:", current_gasnumber)
+        # print("-Ep/Ek:", - bodies.potential_energy() / bodies.kinetic_energy())
+        # print("Total mass:", np.sum(bodies.mass) | units.MSun)
 
         most_advanced_type = star_control(bodies, n_stars)
-        print("MAT:", most_advanced_type)
+        # print("MAT:", most_advanced_type)
 
 
     plt.show()

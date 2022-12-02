@@ -52,7 +52,7 @@ gravity.particles.add_particles(bodies)
 
 
 ## Maak gasdeeltjes
-Ngas = 100  # 10000
+Ngas = 1000  # 10000
 gas = new_plummer_gas_model(Ngas, convert_nbody=converter)
 
 # fig = plt.figure()
@@ -175,6 +175,21 @@ def simulate(gravity, hydro, gravhydro, evolution, wind, channel, bodies, gas, t
     return gravity, hydro, gravhydro, evolution, wind, bodies, gas
 
 
+def print_info(gravity_initial_total_energy, gravity, hydro, gas, i, start_mass, bodies, t):
+        dE_gravity = gravity_initial_total_energy/(gravity.get_total_energy()+hydro.get_total_energy())
+        print("dE:", dE_gravity, "; t=", t)
+        current_gasmass = np.sum(gas.mass)
+        if i == 0:
+            start_mass = current_gasmass
+        print("Mass change in stars:", current_gasmass-start_mass)
+
+        print("Total mass of gas:", current_gasmass)
+        current_gasnumber = current_gasmass/mgas        
+        print("# of gass particles:", current_gasnumber)
+        print("-Ep/Ek:", - bodies.potential_energy() / bodies.kinetic_energy())
+        print("Total mass:", np.sum(bodies.mass) | units.MSun)
+        return start_mass
+
 def gravity_hydro_bridge(gravity, hydro, gravhydro, evolution, wind, channel, bodies, gas, t_end, dt, dt_bridge, n_stars):
     gravity_initial_total_energy = gravity.get_total_energy() + hydro.get_total_energy()
     model_time = 0 | units.Myr
@@ -185,6 +200,7 @@ def gravity_hydro_bridge(gravity, hydro, gravhydro, evolution, wind, channel, bo
 
     fig_complete = True
     fig, ax = False, False
+    start_mass = False
     onestepplot()
     for i, t in enumerate(tqdm(t_steps)):
         gravity, hydro, gravhydro, evolution, wind, bodies, gas = simulate(gravity, hydro, gravhydro, evolution, wind, channel, bodies, gas, t)
@@ -192,20 +208,14 @@ def gravity_hydro_bridge(gravity, hydro, gravhydro, evolution, wind, channel, bo
         #     fig, ax, fig_complete = ninestepplot(bodies, gas, i, t, "Cluster at initialization", "Replace_initialization.png", fig, ax, fig_complete)
         
         dE_gravity = gravity_initial_total_energy/(gravity.get_total_energy()+hydro.get_total_energy())
-        # print("dE:", dE_gravity, "; t=", t)
         current_gasmass = np.sum(gas.mass)
         if i == 0:
             start_mass = current_gasmass
-        # print("Mass change in stars:", current_gasmass-start_mass)
-
-        # print("Total mass of gas:", current_gasmass)
         current_gasnumber = current_gasmass/mgas        
-        # print("# of gass particles:", current_gasnumber)
-        # print("-Ep/Ek:", - bodies.potential_energy() / bodies.kinetic_energy())
-        # print("Total mass:", np.sum(bodies.mass) | units.MSun)
+    
+        # start_mass = print_info(gravity_initial_total_energy, gravity, hydro, gas, i, start_mass, bodies, t)
 
         most_advanced_type = star_control(bodies, n_stars)
-        # print("MAT:", most_advanced_type)
         if most_advanced_type == 14:
             t_SN = t
             onestepplot()
@@ -219,17 +229,10 @@ def gravity_hydro_bridge(gravity, hydro, gravhydro, evolution, wind, channel, bo
         
         if (i>2000) & (i<2010):
             fig, ax, fig_complete = ninestepplot(bodies, gas, i-2001, t, "Cluster longer after supernova", "Replace_longer_after_supernova.png", fig, ax, fig_complete)
-        dE_gravity = gravity_initial_total_energy/(gravity.get_total_energy()+hydro.get_total_energy())
-        # print("dE:", dE_gravity, "; t=", t)
-        current_gasmass = np.sum(gas.mass)
-        # print("Total mass of gas:", current_gasmass)
-        current_gasnumber = current_gasmass/mgas        
-        # print("# of gass particles:", current_gasnumber)
-        # print("-Ep/Ek:", - bodies.potential_energy() / bodies.kinetic_energy())
-        # print("Total mass:", np.sum(bodies.mass) | units.MSun)
+
+        start_mass = print_info(gravity_initial_total_energy, gravity, hydro, gas, i, start_mass, bodies, t)
 
         most_advanced_type = star_control(bodies, n_stars)
-        # print("MAT:", most_advanced_type)
 
 
     plt.show()

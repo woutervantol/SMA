@@ -168,7 +168,7 @@ def simulate(gravity, hydro, gravhydro, evolution, wind, channel, bodies, gas, t
     channel["evo_to_stars"].copy()
     channel["stars_to_wind"].copy()      # wind with hydro and grav: Book 8.1.1 p.323
     gas.synchronize_to(hydro.particles) # Dit klopt volgens mij, maar zorgt wel voor een uiteindelijke crash: navragen
-    gravhydro.evolve_model(t)   
+    gravhydro.evolve_model(t)
     delete_outofbounds()
     channel["to_stars"].copy()
     channel["to_gas"].copy()
@@ -226,9 +226,11 @@ def gravity_hydro_bridge(gravity, hydro, gravhydro, evolution, wind, channel, bo
         gravity, hydro, gravhydro, evolution, wind, bodies, gas = simulate(gravity, hydro, gravhydro, evolution, wind, channel, bodies, gas, t)
         # if i < 9:
         #     fig, ax, fig_complete = ninestepplot(bodies, gas, i, t, "Cluster after supernova", "Replace_after_supernova.png", fig, ax, fig_complete)
-        
-        if (i>2000) & (i<2010):
-            fig, ax, fig_complete = ninestepplot(bodies, gas, i-2001, t, "Cluster longer after supernova", "Replace_longer_after_supernova.png", fig, ax, fig_complete)
+        if t.value_in(units.Myr) > 8:
+            onestepplot()
+            break
+        # if (i>2000) & (i<2010):
+        #     fig, ax, fig_complete = ninestepplot(bodies, gas, i-2001, t, "Cluster longer after supernova", "Replace_longer_after_supernova.png", fig, ax, fig_complete)
 
         start_mass = print_info(gravity_initial_total_energy, gravity, hydro, gas, i, start_mass, bodies, t)
 
@@ -241,8 +243,8 @@ def gravity_hydro_bridge(gravity, hydro, gravhydro, evolution, wind, channel, bo
     gravity.stop()
     hydro.stop()
 
-t_end = 100.0 | units.Myr
-gravity_hydro_bridge(gravity, hydro, gravhydro, evolution, wind, channel, bodies, gas, t_end, dt, dt_bridge, n_stars)
+t_end = 10.0 | units.Myr
+# gravity_hydro_bridge(gravity, hydro, gravhydro, evolution, wind, channel, bodies, gas, t_end, dt, dt_bridge, n_stars)
 
 
 

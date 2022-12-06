@@ -3,7 +3,7 @@ from matplotlib import animation
 
 fig, ax = plt.subplots()
 
-
+dt_SN = 0.001 | units.Myr
 
 model_time = 0 | units.Myr
 t_steps = np.arange(model_time.value_in(units.Myr), t_end.value_in(units.Myr), dt.value_in(units.Myr)) | units.Myr
@@ -19,9 +19,9 @@ def makeplot(time):
     ax.scatter(gas.x.value_in(units.parsec), gas.y.value_in(units.parsec), s=0.5, label="gas")
     ax.scatter(bodies.x.value_in(units.parsec), bodies.y.value_in(units.parsec), s=3, label="stars")
     ax.scatter(bodies[np.argmax(bodies.mass)].x.value_in(units.parsec), bodies[np.argmax(bodies.mass)].y.value_in(units.parsec), s=5, c="red")
-    
-    
-    
+
+
+
 
 def update(time, gravity, hydro, gravhydro, evolution, wind, channel, bodies, gas, t_end, dt, dt_bridge, n_stars):
     if star_control(bodies, n_stars) != 14:
@@ -29,7 +29,11 @@ def update(time, gravity, hydro, gravhydro, evolution, wind, channel, bodies, ga
         print(time, "of", t_end)
         makeplot(time)
     else:
-        pass
+        hydro.parameters.timestep = dt_SN / 2
+        gravhydro.timestep = dt_SN * 2
+        gravity, hydro, gravhydro, evolution, wind, bodies, gas = simulate(gravity, hydro, gravhydro, evolution, wind, channel, bodies, gas, time)
+        print(time, "of", t_end)
+        makeplot(time)
 
 anim = animation.FuncAnimation(fig, update, frames=t_steps, fargs=(gravity, hydro, gravhydro, evolution, wind, channel, bodies, gas, t_end, dt, dt_bridge, n_stars))
 plt.legend()

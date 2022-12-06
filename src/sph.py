@@ -22,8 +22,28 @@ dt_winds = 0.05 | units.Myr
 dt_hydro = 0.01 | units.Myr
 dt_bridge = 0.05 | units.Myr  #1.0*Pinner
 
+def new_create_cheese(newgas, stars):
+    oldgas = newgas.copy()
+    tryradii = np.logspace(np.log10(0.001), np.log10(1), 50) | units.parsec
+    sorted_stars = np.sort(stars.mass)
+    for m_star in sorted_stars:
+        star = stars[stars.mass == m_star]
+        for r in tryradii:
+            gas_to_remove = newgas[(star.position - newgas.position).lengths()<r]
+            if np.sum(gas_to_remove.mass) > star.mass:
+                newgas.remove_particle(gas_to_remove)
+                break
+    # fig = plt.figure()
+    # ax = fig.add_subplot(projection='3d')
+    # ax.scatter(oldgas.x.value_in(units.parsec), oldgas.y.value_in(units.parsec), oldgas.z.value_in(units.parsec), s=0.5)
+    # ax.scatter(newgas.x.value_in(units.parsec), newgas.y.value_in(units.parsec), newgas.z.value_in(units.parsec), s=0.5)
+    # ax.scatter(bodies.x.value_in(units.parsec), bodies.y.value_in(units.parsec), bodies.z.value_in(units.parsec), s=4)
+    # plt.show()
+    return newgas
+
 
 def create_cheese(gas, stars, r):
+    
     cheesegas = gas.select(lambda gaspos: ((stars.position-gaspos).lengths()<r).any(),["position"])
     return gas.difference(cheesegas)    # Testcode hiervan ook opslaan in github! Kunnen ze ook naar kijken. Aanpassen op basis van massa ster (eerst lage massas kazen)
 
@@ -41,31 +61,28 @@ print("max mass star:", m_stars[np.argmax(m_stars)])
 
 
 r_cluster = 1.0 | units.parsec
-converter=nbody_system.nbody_to_si(m_stars.sum(),r_cluster)
+gravconverter=nbody_system.nbody_to_si(total_mass,r_cluster)
 
-bodies=new_fractal_cluster_model(n_stars,fractal_dimension= 1.6, convert_nbody=converter)
-bodies.scale_to_standard(converter)
+bodies=new_fractal_cluster_model(n_stars,fractal_dimension= 1.6, convert_nbody=gravconverter)
+bodies.scale_to_standard(gravconverter)
 bodies.mass = m_stars
 SNstar = bodies[np.argmax(bodies.mass)]
-gravity = ph4(converter)
+gravity = ph4(gravconverter)
 gravity.particles.add_particles(bodies)
 
 
 ## Maak gasdeeltjes
 Ngas = 1000  # 10000
-gas = new_plummer_gas_model(Ngas, convert_nbody=converter)
+total_gas_mass = 5*total_mass
+gasconverter=nbody_system.nbody_to_si(total_gas_mass+total_mass,r_cluster)
+gas = new_plummer_gas_model(Ngas, convert_nbody=gasconverter)
+# gas.scale_to_standard(gasconverter)
 
-# fig = plt.figure()
-# ax = fig.add_subplot(projection='3d')
-# ax.scatter(gas.x.value_in(units.parsec), gas.y.value_in(units.parsec), gas.z.value_in(units.parsec), s=1)
-gas = create_cheese(gas, bodies, 0.6 | units.parsec) # Gasdeeltjes weghalen op basis van massa van de ster
-# ax.scatter(gas.x.value_in(units.parsec), gas.y.value_in(units.parsec), gas.z.value_in(units.parsec), s=1)
-# ax.scatter(bodies.x.value_in(units.parsec), bodies.y.value_in(units.parsec), bodies.z.value_in(units.parsec), s=4, color="black")
-# plt.show()
+gas = new_create_cheese(gas, bodies)
 
 
 #create a hydro code and a gas distribution and put the gas in the hydro code
-hydro = Fi(converter, mode='g6lib')
+hydro = Fi(gravconverter, mode='g6lib')
 hydro.parameters.gamma = 1
 hydro.parameters.isothermal_flag = True
 hydro.parameters.integrate_entropy_flag = False
@@ -145,18 +162,20 @@ def onestepplot():
     plt.ylabel("parsec")
     plt.show()
 
+def plot_energies(Us, Ks, Ts):
+    plt.semilogy(Ts, Us, label="potential energy")
+    plt.semilogy(Ts, Ks, label="kinetic energy")
+    plt.xlabel("Time (Myr)")
+    plt.ylabel("Energy (m^2 kg s^-2)")
+    plt.legend()
+    plt.show()
+
 def star_control(bodies, n_stars):
         bodies_pd = pd.DataFrame(np.array(bodies.stellar_type.number), columns=["stellar_type"])
-        # print("\n", bodies_pd.value_counts(), "\n")
-        # if int(bodies_pd.value_counts().loc[1]) < n_stars:
-        #     if list(bodies_pd.value_counts().index[1]) == [14]: 
-        #         print("Black holes:", int(bodies_pd.value_counts().loc[14]))
-        #     if list(bodies_pd.value_counts().index[1]) == [4]: 
-        #         print("Core helium burning stars:", int(bodies_pd.value_counts().loc[4]))
         return list(bodies_pd.value_counts().index[-1])[0]
 
 def delete_outofbounds():
-    mask = gas.position.lengths() >= 1e19|units.m
+    mask = gas.position.lengths() >= 1e18|units.m
     selection = gas[mask]
     gas.remove_particles(selection)
 
@@ -167,7 +186,7 @@ def simulate(gravity, hydro, gravhydro, evolution, wind, channel, bodies, gas, t
     channel["evo_to_grav"].copy()
     channel["evo_to_stars"].copy()
     channel["stars_to_wind"].copy()      # wind with hydro and grav: Book 8.1.1 p.323
-    gas.synchronize_to(hydro.particles) # Dit klopt volgens mij, maar zorgt wel voor een uiteindelijke crash: navragen
+    gas.synchronize_to(hydro.particles)
     gravhydro.evolve_model(t)
     delete_outofbounds()
     channel["to_stars"].copy()
@@ -188,63 +207,71 @@ def print_info(gravity_initial_total_energy, gravity, hydro, gas, i, start_mass,
         print("# of gass particles:", current_gasnumber)
         print("-Ep/Ek:", - bodies.potential_energy() / bodies.kinetic_energy())
         print("Total mass:", np.sum(bodies.mass) | units.MSun)
-        return start_mass
 
+
+# print(dir(gas))
 def gravity_hydro_bridge(gravity, hydro, gravhydro, evolution, wind, channel, bodies, gas, t_end, dt, dt_bridge, n_stars):
-    gravity_initial_total_energy = gravity.get_total_energy() + hydro.get_total_energy()
-    model_time = 0 | units.Myr
     dt_SN = 0.001 | units.Myr
-
-    t_steps = np.arange(model_time.value_in(units.Myr), t_end.value_in(units.Myr), dt.value_in(units.Myr)) | units.Myr
-    t_steps_coderen = np.concatenate((t_steps[:1], t_steps[28:]), axis=None)    # Voor snelheid coderen
-
-    fig_complete = True
-    fig, ax = False, False
-    start_mass = False
+    t_steps = np.arange(0, t_end.value_in(units.Myr), dt.value_in(units.Myr)) | units.Myr
     onestepplot()
+
+    Us = []
+    Ks = []
+    Ts = []
+
     for i, t in enumerate(tqdm(t_steps)):
         gravity, hydro, gravhydro, evolution, wind, bodies, gas = simulate(gravity, hydro, gravhydro, evolution, wind, channel, bodies, gas, t)
-        # if i < 9:
-        #     fig, ax, fig_complete = ninestepplot(bodies, gas, i, t, "Cluster at initialization", "Replace_initialization.png", fig, ax, fig_complete)
         
-        dE_gravity = gravity_initial_total_energy/(gravity.get_total_energy()+hydro.get_total_energy())
-        current_gasmass = np.sum(gas.mass)
-        if i == 0:
-            start_mass = current_gasmass
-        current_gasnumber = current_gasmass/mgas        
-    
-        # start_mass = print_info(gravity_initial_total_energy, gravity, hydro, gas, i, start_mass, bodies, t)
+        # dE_gravity = gravity_initial_total_energy/(gravity.get_total_energy()+hydro.get_total_energy()) 
+        # print_info(gravity_initial_total_energy, gravity, hydro, gas, i, start_mass, bodies, t)
 
-        most_advanced_type = star_control(bodies, n_stars)
-        if most_advanced_type == 14:
+        # print(np.sort(gas.velocity.lengths())[-6:])
+        U = bodies.potential_energy() + gas.potential_energy()
+        K = bodies.kinetic_energy() + gas.kinetic_energy()
+        # print(U, K, U+K)
+        Us.append(abs(U.value_in(units.m**2 * units.kg * units.s**-2)))
+        Ks.append(abs(K.value_in(units.m**2 * units.kg * units.s**-2)))
+        Ts.append(t.value_in(units.Myr))
+        
+        # print(K, U, K+U) # if K > U, stars will escape, so K+U < 0
+
+        if star_control(bodies, n_stars) == 14:
             t_SN = t
+            hydro.parameters.timestep = dt_SN / 2
+            gravhydro.timestep = dt_SN*2
+            plot_energies(Us, Ks, Ts)
             onestepplot()
             break
     
-    t_steps_supernova = np.arange(t_SN.value_in(units.Myr), t_end.value_in(units.Myr), dt_SN.value_in(units.Myr)) | units.Myr
+    t_steps_supernova = np.arange(t_SN.value_in(units.Myr), t_SN.value_in(units.Myr) + 2, dt_SN.value_in(units.Myr)) | units.Myr
     for i, t in enumerate(tqdm(t_steps_supernova)):
         gravity, hydro, gravhydro, evolution, wind, bodies, gas = simulate(gravity, hydro, gravhydro, evolution, wind, channel, bodies, gas, t)
-        # if i < 9:
-        #     fig, ax, fig_complete = ninestepplot(bodies, gas, i, t, "Cluster after supernova", "Replace_after_supernova.png", fig, ax, fig_complete)
+
+        U = bodies.potential_energy() + gas.potential_energy()
+        K = bodies.kinetic_energy() + gas.kinetic_energy()
+        print(K, U, K+U) # if K > U, stars will escape, so K+U < 0
+
+        # print(np.sort(gas.velocity.lengths())[-6:])
+        # print(np.sort(gas.position.lengths())[-6:])
+        # print(len(gas))
+
         if t.value_in(units.Myr) > 8:
             onestepplot()
             break
-        # if (i>2000) & (i<2010):
-        #     fig, ax, fig_complete = ninestepplot(bodies, gas, i-2001, t, "Cluster longer after supernova", "Replace_longer_after_supernova.png", fig, ax, fig_complete)
 
-        start_mass = print_info(gravity_initial_total_energy, gravity, hydro, gas, i, start_mass, bodies, t)
+        # print_info(gravity_initial_total_energy, gravity, hydro, gas, i, start_mass, bodies, t)
 
-        most_advanced_type = star_control(bodies, n_stars)
+        # most_advanced_type = star_control(bodies, n_stars)
 
 
-    plt.show()
     
     evolution.stop()
     gravity.stop()
     hydro.stop()
+    
 
 t_end = 10.0 | units.Myr
-# gravity_hydro_bridge(gravity, hydro, gravhydro, evolution, wind, channel, bodies, gas, t_end, dt, dt_bridge, n_stars)
+gravity_hydro_bridge(gravity, hydro, gravhydro, evolution, wind, channel, bodies, gas, t_end, dt, dt_bridge, n_stars)
 
 
 

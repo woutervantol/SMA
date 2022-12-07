@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -8,6 +9,7 @@ from amuse.community.ph4.interface import ph4
 from amuse.couple import bridge
 from amuse.ext.orbital_elements import orbital_elements_from_binary
 from amuse.ext.salpeter import new_salpeter_mass_distribution
+from amuse.ext.stellar_wind import new_stellar_wind
 from amuse.ext import stellar_wind
 from amuse.ic.plummer import new_plummer_sphere
 from amuse.lab import (new_plummer_gas_model, new_plummer_sphere)
@@ -27,8 +29,27 @@ dt_winds = 0.05 | units.Myr
 dt_hydro = 0.01 | units.Myr
 dt_bridge = 0.05 | units.Myr  #1.0*Pinner
 
-def new_create_cheese(newgas, stars):
-    oldgas = newgas.copy()
+def create_swiss_cheese_gas(initial_gas, stars):
+    """Create Swiss cheese holes in a gas according to a star distribution.
+    
+    Removes gas around the position of stars where the mass of the removed gas
+    equals the mass of the star. This results in a gas distribution with holes
+    or a Swiss cheese like distribution.
+
+    Parameters
+    ----------
+    initial_gas
+        The initial gas distribution in where the holes will be cut into.
+    stars
+        The distribution of stars used to remove gas from the initial gas
+        distribution.
+
+    Returns
+    -------
+    newgas
+        The new swiss cheese gas distribution.
+    """
+    newgas = initial_gas.copy()
     tryradii = np.logspace(np.log10(0.001), np.log10(1), 50) | units.parsec
     sorted_stars = np.sort(stars.mass)
     for m_star in sorted_stars:
@@ -38,19 +59,7 @@ def new_create_cheese(newgas, stars):
             if np.sum(gas_to_remove.mass) > star.mass:
                 newgas.remove_particle(gas_to_remove)
                 break
-    # fig = plt.figure()
-    # ax = fig.add_subplot(projection='3d')
-    # ax.scatter(oldgas.x.value_in(units.parsec), oldgas.y.value_in(units.parsec), oldgas.z.value_in(units.parsec), s=0.5)
-    # ax.scatter(newgas.x.value_in(units.parsec), newgas.y.value_in(units.parsec), newgas.z.value_in(units.parsec), s=0.5)
-    # ax.scatter(bodies.x.value_in(units.parsec), bodies.y.value_in(units.parsec), bodies.z.value_in(units.parsec), s=4)
-    # plt.show()
     return newgas
-
-
-def create_cheese(gas, stars, r):
-    
-    cheesegas = gas.select(lambda gaspos: ((stars.position-gaspos).lengths()<r).any(),["position"])
-    return gas.difference(cheesegas)    # Testcode hiervan ook opslaan in github! Kunnen ze ook naar kijken. Aanpassen op basis van massa ster (eerst lage massas kazen)
 
 
 #create stars with masses, positions and velocities and put them in the ph4 module
@@ -83,7 +92,7 @@ gasconverter=nbody_system.nbody_to_si(total_gas_mass+total_mass,r_cluster)
 gas = new_plummer_gas_model(Ngas, convert_nbody=gasconverter)
 # gas.scale_to_standard(gasconverter)
 
-gas = new_create_cheese(gas, bodies)
+gas = create_swiss_cheese_gas(gas, bodies)
 
 
 #create a hydro code and a gas distribution and put the gas in the hydro code
@@ -125,7 +134,6 @@ ch_e2b.copy()
 
 
 # Stellar wind  p. 223
-from amuse.ext.stellar_wind import new_stellar_wind
 wind = new_stellar_wind(mgas, target_gas=gas, timestep=dt_winds, derive_from_evolution=True)
 wind.particles.add_particles(bodies)
 

@@ -1,3 +1,4 @@
+from os import getcwd, chdir
 from sph import *
 from matplotlib import animation
 
@@ -7,6 +8,14 @@ dt_SN = 0.01 | units.Myr
 
 model_time = 0 | units.Myr
 t_steps = np.arange(model_time.value_in(units.Myr), t_end.value_in(units.Myr), dt.value_in(units.Myr)) | units.Myr
+
+def fix_cwd():
+    folder = getcwd().split("/")[-1]
+    print(folder)
+    if folder == "src":
+        chdir("../")
+    folder = getcwd().split("/")[-1]
+    print(folder)
 
 def makeplot(time):
     ax.cla()
@@ -50,5 +59,6 @@ def update(times, gravity, hydro, gravhydro, evolution, wind, channel, bodies, g
 anim = animation.FuncAnimation(fig, update, frames=calc_time, fargs=(gravity, hydro, gravhydro, evolution, wind, channel, bodies, gas, t_end, dt, dt_bridge, n_stars), save_count=1000)
 plt.legend()
 writer = animation.FFMpegWriter(fps=len(t_steps)/6.)
-anim.save("./animation.mp4", writer=writer)
+fix_cwd()
+anim.save("./figures/animation.mp4", writer=writer)
 # plt.show()

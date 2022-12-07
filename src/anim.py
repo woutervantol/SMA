@@ -3,15 +3,14 @@ from matplotlib import animation
 
 fig, ax = plt.subplots()
 
-dt_SN = 0.001 | units.Myr
+dt_SN = 0.01 | units.Myr
 
 model_time = 0 | units.Myr
 t_steps = np.arange(model_time.value_in(units.Myr), t_end.value_in(units.Myr), dt.value_in(units.Myr)) | units.Myr
 
-# for i, t in enumerate(tqdm(t_steps)):
 def makeplot(time):
     ax.cla()
-    ax.set_title("{:.1f} Myr".format(time.value_in(units.Myr)))
+    ax.set_title("{:.2f} Myr".format(time.value_in(units.Myr)))
     ax.set_xlim(-5, 5)
     ax.set_ylim(-5, 5)
     ax.set_xlabel("parsec")
@@ -21,21 +20,34 @@ def makeplot(time):
     ax.scatter(bodies[np.argmax(bodies.mass)].x.value_in(units.parsec), bodies[np.argmax(bodies.mass)].y.value_in(units.parsec), s=5, c="red")
 
 
+def calc_time():
+    model_time = 0 | units.Myr
+    while star_control(bodies, n_stars) != 4:
+        model_time = np.round((model_time+dt).value_in(units.Myr), 4) | units.Myr
+        yield model_time, dt
+    endtime = model_time + (1|units.Myr)
+    while model_time < endtime:
+        print(star_control(bodies, n_stars))
+        model_time = np.round((model_time+dt_SN).value_in(units.Myr), 6) | units.Myr
+        yield model_time, dt_SN
 
 
-def update(time, gravity, hydro, gravhydro, evolution, wind, channel, bodies, gas, t_end, dt, dt_bridge, n_stars):
-    if star_control(bodies, n_stars) != 14:
+
+def update(times, gravity, hydro, gravhydro, evolution, wind, channel, bodies, gas, t_end, dt, dt_bridge, n_stars):
+    time = times[0]
+    print(time)
+    timestep = times[1]
+    if timestep == dt:
         gravity, hydro, gravhydro, evolution, wind, bodies, gas = simulate(gravity, hydro, gravhydro, evolution, wind, channel, bodies, gas, time)
-        print(time, "of", t_end)
         makeplot(time)
     else:
         hydro.parameters.timestep = dt_SN / 2
         gravhydro.timestep = dt_SN * 2
         gravity, hydro, gravhydro, evolution, wind, bodies, gas = simulate(gravity, hydro, gravhydro, evolution, wind, channel, bodies, gas, time)
-        print(time, "of", t_end)
         makeplot(time)
 
-anim = animation.FuncAnimation(fig, update, frames=t_steps, fargs=(gravity, hydro, gravhydro, evolution, wind, channel, bodies, gas, t_end, dt, dt_bridge, n_stars))
+# gravity, hydro, gravhydro, evolution, wind, bodies, gas = simulate(gravity, hydro, gravhydro, evolution, wind, channel, bodies, gas, 6.400999999999994 | units.Myr)
+anim = animation.FuncAnimation(fig, update, frames=calc_time, fargs=(gravity, hydro, gravhydro, evolution, wind, channel, bodies, gas, t_end, dt, dt_bridge, n_stars), save_count=1000)
 plt.legend()
 writer = animation.FFMpegWriter(fps=len(t_steps)/6.)
 anim.save("./animation.mp4", writer=writer)

@@ -16,6 +16,11 @@ from tqdm import tqdm
 from amuse.community.fractalcluster.interface import new_fractal_cluster_model
 from amuse.community.seba.interface import SeBa
 
+# np.random.seed(1)
+
+# x = 1|units.parsec
+# t = 0.01|units.Myr
+# print((x/t).value_in(units.ms))
 
 dt = 0.1 | units.Myr
 dt_winds = 0.05 | units.Myr
@@ -186,6 +191,7 @@ def simulate(gravity, hydro, gravhydro, evolution, wind, channel, bodies, gas, t
     channel["evo_to_grav"].copy()
     channel["evo_to_stars"].copy()
     channel["stars_to_wind"].copy()      # wind with hydro and grav: Book 8.1.1 p.323
+    delete_outofbounds()
     gas.synchronize_to(hydro.particles)
     gravhydro.evolve_model(t)
     delete_outofbounds()
@@ -211,9 +217,9 @@ def print_info(gravity_initial_total_energy, gravity, hydro, gas, i, start_mass,
 
 # print(dir(gas))
 def gravity_hydro_bridge(gravity, hydro, gravhydro, evolution, wind, channel, bodies, gas, t_end, dt, dt_bridge, n_stars):
-    dt_SN = 0.001 | units.Myr
+    dt_SN = 0.01 | units.Myr
     t_steps = np.arange(0, t_end.value_in(units.Myr), dt.value_in(units.Myr)) | units.Myr
-    onestepplot()
+    # onestepplot()
 
     Us = []
     Ks = []
@@ -221,50 +227,45 @@ def gravity_hydro_bridge(gravity, hydro, gravhydro, evolution, wind, channel, bo
 
     for i, t in enumerate(tqdm(t_steps)):
         gravity, hydro, gravhydro, evolution, wind, bodies, gas = simulate(gravity, hydro, gravhydro, evolution, wind, channel, bodies, gas, t)
-        
-        # dE_gravity = gravity_initial_total_energy/(gravity.get_total_energy()+hydro.get_total_energy()) 
-        # print_info(gravity_initial_total_energy, gravity, hydro, gas, i, start_mass, bodies, t)
 
-        # print(np.sort(gas.velocity.lengths())[-6:])
         U = bodies.potential_energy() + gas.potential_energy()
         K = bodies.kinetic_energy() + gas.kinetic_energy()
-        # print(U, K, U+K)
+        # print(U, K, abs(U/K))
         Us.append(abs(U.value_in(units.m**2 * units.kg * units.s**-2)))
         Ks.append(abs(K.value_in(units.m**2 * units.kg * units.s**-2)))
         Ts.append(t.value_in(units.Myr))
-        
-        # print(K, U, K+U) # if K > U, stars will escape, so K+U < 0
+    
+        # print_info(gravity_initial_total_energy, gravity, hydro, gas, i, start_mass, bodies, t)
 
-        if star_control(bodies, n_stars) == 14:
+        if star_control(bodies, n_stars) == 4:
             t_SN = t
+            print(t_SN)
             hydro.parameters.timestep = dt_SN / 2
             gravhydro.timestep = dt_SN*2
-            plot_energies(Us, Ks, Ts)
-            onestepplot()
+            # plot_energies(Us, Ks, Ts)
+            # onestepplot()
             break
     
     t_steps_supernova = np.arange(t_SN.value_in(units.Myr), t_SN.value_in(units.Myr) + 2, dt_SN.value_in(units.Myr)) | units.Myr
     for i, t in enumerate(tqdm(t_steps_supernova)):
         gravity, hydro, gravhydro, evolution, wind, bodies, gas = simulate(gravity, hydro, gravhydro, evolution, wind, channel, bodies, gas, t)
 
+        
         U = bodies.potential_energy() + gas.potential_energy()
         K = bodies.kinetic_energy() + gas.kinetic_energy()
-        print(K, U, K+U) # if K > U, stars will escape, so K+U < 0
-
-        # print(np.sort(gas.velocity.lengths())[-6:])
-        # print(np.sort(gas.position.lengths())[-6:])
-        # print(len(gas))
-
-        if t.value_in(units.Myr) > 8:
-            onestepplot()
-            break
+        # print(K, U, abs(K/U))
+        Us.append(abs(U.value_in(units.m**2 * units.kg * units.s**-2)))
+        Ks.append(abs(K.value_in(units.m**2 * units.kg * units.s**-2)))
+        Ts.append(t.value_in(units.Myr))
 
         # print_info(gravity_initial_total_energy, gravity, hydro, gas, i, start_mass, bodies, t)
 
-        # most_advanced_type = star_control(bodies, n_stars)
-
 
     
+    plot_energies(Us, Ks, Ts)
+    # onestepplot()
+    
+
     evolution.stop()
     gravity.stop()
     hydro.stop()
@@ -272,7 +273,6 @@ def gravity_hydro_bridge(gravity, hydro, gravhydro, evolution, wind, channel, bo
 
 t_end = 10.0 | units.Myr
 gravity_hydro_bridge(gravity, hydro, gravhydro, evolution, wind, channel, bodies, gas, t_end, dt, dt_bridge, n_stars)
-
 
 
 

@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 from os import getcwd, chdir
 from sph import *
 from matplotlib import animation
@@ -29,11 +32,12 @@ def makeplot(time, Us, Ks, Ts):
 
 def fix_cwd():
     folder = getcwd().split("/")[-1]
-    print(folder)
     if folder == "src":
         chdir("../")
     folder = getcwd().split("/")[-1]
-    print(folder)
+    if not folder == "SMA":
+        print("Please execute this script from the main project folder.")
+        exit(1)
 
 
 def calc_time():

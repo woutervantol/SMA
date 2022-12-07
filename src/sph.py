@@ -5,7 +5,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from amuse.community.fi.interface import Fi
+from amuse.community.fractalcluster.interface import new_fractal_cluster_model
 from amuse.community.ph4.interface import ph4
+from amuse.community.seba.interface import SeBa
 from amuse.couple import bridge
 from amuse.ext.orbital_elements import orbital_elements_from_binary
 from amuse.ext.salpeter import new_salpeter_mass_distribution
@@ -14,9 +16,8 @@ from amuse.ext import stellar_wind
 from amuse.ic.plummer import new_plummer_sphere
 from amuse.lab import (new_plummer_gas_model, new_plummer_sphere)
 from amuse.units import (units, constants, nbody_system)
+from os import getcwd, chdir
 from tqdm import tqdm
-from amuse.community.fractalcluster.interface import new_fractal_cluster_model
-from amuse.community.seba.interface import SeBa
 
 np.random.seed(1)
 
@@ -24,10 +25,14 @@ np.random.seed(1)
 # t = 0.1|units.Myr
 # print((x/t).value_in(units.ms))
 
-dt = 0.1 | units.Myr
-dt_winds = 0.05 | units.Myr
-dt_hydro = 0.01 | units.Myr
-dt_bridge = 0.05 | units.Myr  #1.0*Pinner
+def fix_cwd():
+    folder = getcwd().split("/")[-1]
+    if folder == "src":
+        chdir("../")
+    folder = getcwd().split("/")[-1]
+    if not folder == "SMA":
+        print("Please execute this script from the main project folder.")
+        exit(1)
 
 def create_swiss_cheese_gas(initial_gas, stars):
     """Create Swiss cheese holes in a gas according to a star distribution.
@@ -61,91 +66,6 @@ def create_swiss_cheese_gas(initial_gas, stars):
                 break
     return newgas
 
-
-#create stars with masses, positions and velocities and put them in the ph4 module
-n_stars = 10
-alpha_IMF = -2.35
-while True:
-    m_stars = new_salpeter_mass_distribution(n_stars, 0.1|units.MSun, 100|units.MSun, alpha_IMF)
-    masslist = np.sort(m_stars)
-    if masslist[-1].value_in(units.MSun) > 27 and masslist[-1].value_in(units.MSun) < 33 and masslist[-2].value_in(units.MSun) < 27:
-        break
-total_mass = np.sum(m_stars)
-print("max mass star:", m_stars[np.argmax(m_stars)])
-
-
-r_cluster = 1.0 | units.parsec
-gravconverter=nbody_system.nbody_to_si(total_mass,r_cluster)
-
-bodies=new_fractal_cluster_model(n_stars,fractal_dimension= 1.6, convert_nbody=gravconverter)
-bodies.scale_to_standard(gravconverter)
-bodies.mass = m_stars
-SNstar = bodies[np.argmax(bodies.mass)]
-gravity = ph4(gravconverter)
-gravity.particles.add_particles(bodies)
-
-
-
-## Maak gasdeeltjes
-Ngas = 1000  # 10000
-total_gas_mass = 5*total_mass
-gasconverter=nbody_system.nbody_to_si(total_gas_mass+total_mass,r_cluster)
-gas = new_plummer_gas_model(Ngas, convert_nbody=gasconverter)
-# gas.scale_to_standard(gasconverter)
-
-gas = create_swiss_cheese_gas(gas, bodies)
-
-#create a hydro code and a gas distribution and put the gas in the hydro code
-hydro = Fi(gravconverter, mode='g6lib')
-hydro.parameters.gamma = 1
-hydro.parameters.isothermal_flag = True
-hydro.parameters.integrate_entropy_flag = False
-hydro.parameters.timestep = dt_hydro
-hydro.parameters.verbosity = 0
-hydro.parameters.eps_is_h_flag = False    # h_smooth is constant
-eps = 0.1 | units.au
-hydro.parameters.gas_epsilon = eps
-hydro.parameters.sph_h_const = eps
-
-
-# Ngas = 10000
-# gas = new_plummer_gas_model(Ngas, convert_nbody=converter) #Note: this is virialized gas, so it has velocities
-hydro.particles.add_particles(gas)
-Mgas = np.sum(gas.mass)
-mgas = Mgas/Ngas
-
-
-#bridge the codes
-gravhydro = bridge.Bridge(use_threading=False) #, method=SPLIT_4TH_S_M4)
-gravhydro.add_system(gravity, (hydro,))
-gravhydro.add_system(hydro, (gravity,))
-gravhydro.timestep = dt_bridge # min 2x de output timestep
-
-
-
-# Stellar evolution
-evolution = SeBa()
-evolution.particles.add_particles(bodies)
-ch_e2g = evolution.particles.new_channel_to(gravity.particles)
-ch_g2e = gravity.particles.new_channel_to(bodies) # Unnecessary?
-ch_e2b = evolution.particles.new_channel_to(bodies)
-ch_e2b.copy()
-
-
-
-# Stellar wind  p. 223
-wind = new_stellar_wind(mgas, target_gas=gas, timestep=dt_winds, derive_from_evolution=True)
-wind.particles.add_particles(bodies)
-
-
-channel = {"from_stars": bodies.new_channel_to(gravity.particles),
-            "to_stars": gravity.particles.new_channel_to(bodies),
-            "from_gas": gas.new_channel_to(hydro.particles),
-            "to_gas": hydro.particles.new_channel_to(gas),
-            "evo_to_grav": evolution.particles.new_channel_to(gravity.particles),
-            "evo_to_stars": evolution.particles.new_channel_to(bodies),
-            "stars_to_wind": bodies.new_channel_to(wind.particles)
-            }
 
 def ninestepplot(bodies, gas, i, t, maintitle, savename, fig, ax, fig_complete):
     if fig_complete == True:
@@ -184,13 +104,14 @@ def plot_energies(Us, Ks, Ts):
     plt.show()
 
 def star_control(bodies, n_stars):
-        bodies_pd = pd.DataFrame(np.array(bodies.stellar_type.number), columns=["stellar_type"])
-        return list(bodies_pd.value_counts().index[-1])[0]
+    bodies_pd = pd.DataFrame(np.array(bodies.stellar_type.number), columns=["stellar_type"])
+    return list(bodies_pd.value_counts().index[-1])[0]
 
-def delete_outofbounds():
+def delete_outofbounds(gas):
     mask = gas.position.lengths() >= 1e18|units.m
     selection = gas[mask]
     gas.remove_particles(selection)
+    return gas
 
 
 
@@ -201,7 +122,7 @@ def simulate(gravity, hydro, gravhydro, evolution, wind, channel, bodies, gas, t
     channel["evo_to_stars"].copy()
     channel["stars_to_wind"].copy()      # wind with hydro and grav: Book 8.1.1 p.323
     wind.evolve_model(t)
-    delete_outofbounds()
+    gas = delete_outofbounds(gas)
     gas.synchronize_to(hydro.particles)
     gravhydro.evolve_model(t)
     channel["to_stars"].copy()
@@ -210,18 +131,18 @@ def simulate(gravity, hydro, gravhydro, evolution, wind, channel, bodies, gas, t
 
 
 def print_info(gravity_initial_total_energy, gravity, hydro, gas, i, start_mass, bodies, t):
-        dE_gravity = gravity_initial_total_energy/(gravity.get_total_energy()+hydro.get_total_energy())
-        print("dE:", dE_gravity, "; t=", t)
-        current_gasmass = np.sum(gas.mass)
-        if i == 0:
-            start_mass = current_gasmass
-        print("Mass change in stars:", current_gasmass-start_mass)
+    dE_gravity = gravity_initial_total_energy/(gravity.get_total_energy()+hydro.get_total_energy())
+    print("dE:", dE_gravity, "; t=", t)
+    current_gasmass = np.sum(gas.mass)
+    if i == 0:
+        start_mass = current_gasmass
+    print("Mass change in stars:", current_gasmass-start_mass)
 
-        print("Total mass of gas:", current_gasmass)
-        current_gasnumber = current_gasmass/mgas        
-        print("# of gass particles:", current_gasnumber)
-        print("-Ep/Ek:", - bodies.potential_energy() / bodies.kinetic_energy())
-        print("Total mass:", np.sum(bodies.mass) | units.MSun)
+    print("Total mass of gas:", current_gasmass)
+    current_gasnumber = current_gasmass/mgas        
+    print("# of gass particles:", current_gasnumber)
+    print("-Ep/Ek:", - bodies.potential_energy() / bodies.kinetic_energy())
+    print("Total mass:", np.sum(bodies.mass) | units.MSun)
 
 
 # print(dir(gas))
@@ -291,10 +212,105 @@ def gravity_hydro_bridge(gravity, hydro, gravhydro, evolution, wind, channel, bo
     np.save("./times.npy", Ts)
     
 
-t_end = 10.0 | units.Myr
-gravity_hydro_bridge(gravity, hydro, gravhydro, evolution, wind, channel, bodies, gas, t_end, dt, dt_bridge, n_stars)
+def init_stars(n_stars=10, alpha_IMF=-2.35):
+    #create stars with masses, positions and velocities and put them in the ph4 module
+    while True:
+        m_stars = new_salpeter_mass_distribution(n_stars, 0.1|units.MSun, 100|units.MSun, alpha_IMF)
+        masslist = np.sort(m_stars)
+        if masslist[-1].value_in(units.MSun) > 27 and masslist[-1].value_in(units.MSun) < 33 and masslist[-2].value_in(units.MSun) < 27:
+            break
+    print("max mass star:", m_stars[np.argmax(m_stars)])
+    return m_stars
+
+def main():
+    dt = 0.1 | units.Myr
+    dt_winds = 0.05 | units.Myr
+    dt_hydro = 0.01 | units.Myr
+    dt_bridge = 0.05 | units.Myr  #1.0*Pinner
+    n_stars=10
+    
+    m_stars = init_stars(n_stars)
+    total_mass = np.sum(m_stars)
+
+    r_cluster = 1.0 | units.parsec
+    gravconverter=nbody_system.nbody_to_si(total_mass, r_cluster)
+
+    bodies=new_fractal_cluster_model(n_stars,fractal_dimension= 1.6, convert_nbody=gravconverter)
+    bodies.scale_to_standard(gravconverter)
+    bodies.mass = m_stars
+    SNstar = bodies[np.argmax(bodies.mass)]
+    gravity = ph4(gravconverter)
+    gravity.particles.add_particles(bodies)
 
 
+    ## Maak gasdeeltjes
+    Ngas = 1000  # 10000
+    total_gas_mass = 5*total_mass
+    gasconverter=nbody_system.nbody_to_si(total_gas_mass+total_mass,r_cluster)
+    gas = new_plummer_gas_model(Ngas, convert_nbody=gasconverter)
+    # gas.scale_to_standard(gasconverter)
+
+    gas = create_swiss_cheese_gas(gas, bodies)
+
+
+    #create a hydro code and a gas distribution and put the gas in the hydro code
+    hydro = Fi(gravconverter, mode='g6lib')
+    hydro.parameters.gamma = 1
+    hydro.parameters.isothermal_flag = True
+    hydro.parameters.integrate_entropy_flag = False
+    hydro.parameters.timestep = dt_hydro
+    hydro.parameters.verbosity = 0
+    hydro.parameters.eps_is_h_flag = False    # h_smooth is constant
+    eps = 0.1 | units.au
+    hydro.parameters.gas_epsilon = eps
+    hydro.parameters.sph_h_const = eps
+
+
+    # Ngas = 10000
+    # gas = new_plummer_gas_model(Ngas, convert_nbody=converter) #Note: this is virialized gas, so it has velocities
+    hydro.particles.add_particles(gas)
+    Mgas = np.sum(gas.mass)
+    mgas = Mgas/Ngas
+
+
+    #bridge the codes
+    gravhydro = bridge.Bridge(use_threading=False) #, method=SPLIT_4TH_S_M4)
+    gravhydro.add_system(gravity, (hydro,))
+    gravhydro.add_system(hydro, (gravity,))
+    gravhydro.timestep = dt_bridge # min 2x de output timestep
+
+
+
+    # Stellar evolution
+    evolution = SeBa()
+    evolution.particles.add_particles(bodies)
+    ch_e2g = evolution.particles.new_channel_to(gravity.particles)
+    ch_g2e = gravity.particles.new_channel_to(bodies) # Unnecessary?
+    ch_e2b = evolution.particles.new_channel_to(bodies)
+    ch_e2b.copy()
+
+    # Stellar wind  p. 223
+    wind = new_stellar_wind(mgas, target_gas=gas, timestep=dt_winds, derive_from_evolution=True)
+    wind.particles.add_particles(bodies)
+
+
+    channel = {"from_stars": bodies.new_channel_to(gravity.particles),
+                "to_stars": gravity.particles.new_channel_to(bodies),
+                "from_gas": gas.new_channel_to(hydro.particles),
+                "to_gas": hydro.particles.new_channel_to(gas),
+                "evo_to_grav": evolution.particles.new_channel_to(gravity.particles),
+                "evo_to_stars": evolution.particles.new_channel_to(bodies),
+                "stars_to_wind": bodies.new_channel_to(wind.particles)
+                }
+
+    t_end = 10.0 | units.Myr
+    gravity_hydro_bridge(gravity, hydro, gravhydro, evolution, wind, channel, bodies, gas, t_end, dt, dt_bridge, n_stars)
+    return 0
+
+
+if __name__ == "__main__":
+    fix_cwd()
+    exit(main())
 
 
 # Interessant boek? https://misaladino.com/wp-content/uploads/2019/11/Thesis_Martha_Irene.pdf

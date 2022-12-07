@@ -16,10 +16,10 @@ from tqdm import tqdm
 from amuse.community.fractalcluster.interface import new_fractal_cluster_model
 from amuse.community.seba.interface import SeBa
 
-# np.random.seed(1)
+np.random.seed(1)
 
 # x = 1|units.parsec
-# t = 0.01|units.Myr
+# t = 0.1|units.Myr
 # print((x/t).value_in(units.ms))
 
 dt = 0.1 | units.Myr
@@ -28,7 +28,7 @@ dt_hydro = 0.01 | units.Myr
 dt_bridge = 0.05 | units.Myr  #1.0*Pinner
 
 def new_create_cheese(newgas, stars):
-    oldgas = newgas.copy()
+    # oldgas = newgas.copy()
     tryradii = np.logspace(np.log10(0.001), np.log10(1), 50) | units.parsec
     sorted_stars = np.sort(stars.mass)
     for m_star in sorted_stars:
@@ -76,6 +76,7 @@ gravity = ph4(gravconverter)
 gravity.particles.add_particles(bodies)
 
 
+
 ## Maak gasdeeltjes
 Ngas = 1000  # 10000
 total_gas_mass = 5*total_mass
@@ -84,7 +85,6 @@ gas = new_plummer_gas_model(Ngas, convert_nbody=gasconverter)
 # gas.scale_to_standard(gasconverter)
 
 gas = new_create_cheese(gas, bodies)
-
 
 #create a hydro code and a gas distribution and put the gas in the hydro code
 hydro = Fi(gravconverter, mode='g6lib')
@@ -185,16 +185,17 @@ def delete_outofbounds():
     gas.remove_particles(selection)
 
 
+
+
 def simulate(gravity, hydro, gravhydro, evolution, wind, channel, bodies, gas, t):
     evolution.evolve_model(t)
-    wind.evolve_model(t)
     channel["evo_to_grav"].copy()
     channel["evo_to_stars"].copy()
     channel["stars_to_wind"].copy()      # wind with hydro and grav: Book 8.1.1 p.323
+    wind.evolve_model(t)
     delete_outofbounds()
     gas.synchronize_to(hydro.particles)
     gravhydro.evolve_model(t)
-    delete_outofbounds()
     channel["to_stars"].copy()
     channel["to_gas"].copy()
     return gravity, hydro, gravhydro, evolution, wind, bodies, gas
@@ -225,38 +226,45 @@ def gravity_hydro_bridge(gravity, hydro, gravhydro, evolution, wind, channel, bo
     Ks = []
     Ts = []
 
+    oldpos = []
+    oldvel = []
+
     for i, t in enumerate(tqdm(t_steps)):
         gravity, hydro, gravhydro, evolution, wind, bodies, gas = simulate(gravity, hydro, gravhydro, evolution, wind, channel, bodies, gas, t)
 
         U = bodies.potential_energy() + gas.potential_energy()
         K = bodies.kinetic_energy() + gas.kinetic_energy()
-        # print(U, K, abs(U/K))
         Us.append(abs(U.value_in(units.m**2 * units.kg * units.s**-2)))
         Ks.append(abs(K.value_in(units.m**2 * units.kg * units.s**-2)))
         Ts.append(t.value_in(units.Myr))
-    
+
+        oldpos.append(gas.position)
+        oldvel.append(gas.velocity)
+
         # print_info(gravity_initial_total_energy, gravity, hydro, gas, i, start_mass, bodies, t)
 
         if star_control(bodies, n_stars) == 4:
             t_SN = t
             print(t_SN)
             hydro.parameters.timestep = dt_SN / 2
-            gravhydro.timestep = dt_SN*2
+            gravhydro.timestep = dt_SN/4
             # plot_energies(Us, Ks, Ts)
             # onestepplot()
             break
     
-    t_steps_supernova = np.arange(t_SN.value_in(units.Myr), t_SN.value_in(units.Myr) + 2, dt_SN.value_in(units.Myr)) | units.Myr
+    t_steps_supernova = np.arange(t_SN.value_in(units.Myr), t_SN.value_in(units.Myr) + 3, dt_SN.value_in(units.Myr)) | units.Myr
     for i, t in enumerate(tqdm(t_steps_supernova)):
         gravity, hydro, gravhydro, evolution, wind, bodies, gas = simulate(gravity, hydro, gravhydro, evolution, wind, channel, bodies, gas, t)
 
         
         U = bodies.potential_energy() + gas.potential_energy()
         K = bodies.kinetic_energy() + gas.kinetic_energy()
-        # print(K, U, abs(K/U))
         Us.append(abs(U.value_in(units.m**2 * units.kg * units.s**-2)))
         Ks.append(abs(K.value_in(units.m**2 * units.kg * units.s**-2)))
         Ts.append(t.value_in(units.Myr))
+
+        oldpos.append(gas.position)
+        oldvel.append(gas.velocity)
 
         # print_info(gravity_initial_total_energy, gravity, hydro, gas, i, start_mass, bodies, t)
 
@@ -269,6 +277,10 @@ def gravity_hydro_bridge(gravity, hydro, gravhydro, evolution, wind, channel, bo
     evolution.stop()
     gravity.stop()
     hydro.stop()
+
+    np.save("./positions.npy", oldpos)
+    np.save("./velocities.npy", oldvel)
+    np.save("./times.npy", Ts)
     
 
 t_end = 10.0 | units.Myr

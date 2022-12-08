@@ -39,12 +39,14 @@ def fix_cwd():
 class Clustersimulation:
     """Simulation class."""
 
-    def __init__(self):
+    def __init__(self, gasmass, run):
+        self.gasmass = gasmass
+        self.run = run
         self.dt = 0.1 | units.Myr
         self.dt_winds = 0.05 | units.Myr
-        self.dt_hydro = 0.01 | units.Myr
-        self.dt_bridge = 0.05 | units.Myr  #1.0*Pinner
-        self.dt_SN = 0.01 | units.Myr
+        self.dt_hydro = 0.04 | units.Myr
+        self.dt_bridge = 0.02 | units.Myr  #1.0*Pinner
+        # self.dt_SN = 0.01 | units.Myr
         self.n_stars=10
         self.n_gas = 1000  # 10000
         self.r_cluster = 1.0 | units.parsec
@@ -168,64 +170,64 @@ class Clustersimulation:
 
     def gravity_hydro_bridge(self):
         '''Run the simulation.'''
-        t_steps = np.arange(
-            0, self.t_end.value_in(units.Myr), self.dt.value_in(units.Myr)
-        ) | units.Myr
-        # onestepplot(self.gas, self.bodies)
+        t_steps = np.arange(0, self.t_end.value_in(units.Myr), self.dt.value_in(units.Myr)) | units.Myr
 
         Us = []
         Ks = []
         Ts = []
-
-        oldpos = []
-        oldvel = []
+        gaspos = []
+        gasvel = []
+        starpos = []
+        starvel = []
 
         for timestamp in tqdm(t_steps):
             self.simulate_timestamp(timestamp)
 
             U = self.bodies.potential_energy() + self.gas.potential_energy()
             K = self.bodies.kinetic_energy() + self.gas.kinetic_energy()
+
             Us.append(abs(U.value_in(units.m**2 * units.kg * units.s**-2)))
             Ks.append(abs(K.value_in(units.m**2 * units.kg * units.s**-2)))
             Ts.append(timestamp.value_in(units.Myr))
-
-            oldpos.append(self.gas.position)
-            oldvel.append(self.gas.velocity)
+            gaspos.append(self.gas.position)
+            gasvel.append(self.gas.velocity)
+            starpos.append(self.bodies.position)
+            starvel.append(self.bodies.velocity)
 
             if star_control(self.bodies) == 4:
                 t_SN = timestamp
-                print(t_SN)
-                self.hydro.parameters.timestep = self.dt_SN / 2
-                self.gravhydro.timestep = self.dt_SN/4
-                # plot_energies(Us, Ks, Ts)
-                # onestepplot(self.gas, self.bodies)
-                break
+                self.hydro.parameters.timestep = 0.004 | units.Myr
+                self.gravhydro.timestep = 0.002 | units.Myr
 
-        t_steps_supernova = np.arange(
-            t_SN.value_in(units.Myr), t_SN.value_in(units.Myr) + 3, self.dt_SN.value_in(units.Myr)
-        ) | units.Myr
-        for timestamp in tqdm(t_steps_supernova):
-            self.simulate_timestamp(timestamp)
+        # t_steps_supernova = np.arange(
+        #     t_SN.value_in(units.Myr), t_SN.value_in(units.Myr) + 3, self.dt_SN.value_in(units.Myr)
+        # ) | units.Myr
+        # for timestamp in tqdm(t_steps_supernova):
+        #     self.simulate_timestamp(timestamp)
 
-            U = self.bodies.potential_energy() + self.gas.potential_energy()
-            K = self.bodies.kinetic_energy() + self.gas.kinetic_energy()
-            Us.append(abs(U.value_in(units.m**2 * units.kg * units.s**-2)))
-            Ks.append(abs(K.value_in(units.m**2 * units.kg * units.s**-2)))
-            Ts.append(timestamp.value_in(units.Myr))
+        #     U = self.bodies.potential_energy() + self.gas.potential_energy()
+        #     K = self.bodies.kinetic_energy() + self.gas.kinetic_energy()
+        #     Us.append(abs(U.value_in(units.m**2 * units.kg * units.s**-2)))
+        #     Ks.append(abs(K.value_in(units.m**2 * units.kg * units.s**-2)))
+        #     Ts.append(timestamp.value_in(units.Myr))
 
-            oldpos.append(self.gas.position)
-            oldvel.append(self.gas.velocity)
-
-        plot_energies(Us, Ks, Ts)
-        # onestepplot(self.gas, self.bodies)
+        #     oldpos.append(self.gas.position)
+        #     oldvel.append(self.gas.velocity)
 
         self.evolution.stop()
         self.gravity.stop()
         self.hydro.stop()
 
-        np.save("data/positions.npy", oldpos)
-        np.save("data/velocities.npy", oldvel)
-        np.save("data/times.npy", Ts)
+        filestring = "_ratio{}_run{}".format(self.gasmass, self.run)
+
+        np.save("./data/kinetic{}.npy".format(filestring), Ks)
+        np.save("./data/potential{}.npy".format(filestring), Us)
+        np.save("./data/times{}.npy".format(filestring), Ts)
+        np.save("./data/gaspositions{}.npy".format(filestring), gaspos)
+        np.save("./data/gasvelocities{}.npy".format(filestring), gasvel)
+        np.save("./data/starpositions{}.npy".format(filestring), starpos)
+        np.save("./data/starvelocities{}.npy".format(filestring), starvel)
+        
 
     def simulate_timestamp(self, timestamp):
         '''Run the simulating to the given timestamp.'''
@@ -241,49 +243,8 @@ class Clustersimulation:
         self.channel["to_gas"].copy()
 
 
-def ninestepplot(bodies, gas, i, t, maintitle, savename, fig, ax, fig_complete):
-    '''Plot nine different timesteps in one plot.'''
-    if fig_complete:
-        fig, ax = plt.subplots(3, 3)
-        fig.suptitle(maintitle)
-        ax = ax.flatten()
-        fig_complete = False
-    if i < 9:
-        ax[i].scatter(gas.x.value_in(units.parsec), gas.y.value_in(units.parsec), s=1)
-        ax[i].scatter(bodies.x.value_in(units.parsec), bodies.y.value_in(units.parsec), s=1)
-        ax[i].scatter(
-            bodies[np.argmax(bodies.mass)].x.value_in(units.parsec),
-            bodies[np.argmax(bodies.mass)].y.value_in(units.parsec),
-            s=5,
-            c="red"
-        )
-        ax[i].set_title('t = '+str(t))
-    if i == 8:
-        fig.savefig(savename)
-        fig_complete = True
-        plt.show()
-    return fig, ax, fig_complete
 
-def onestepplot(gas, bodies):
-    """Plot one simulation step."""
-    plt.scatter(gas.x.value_in(units.parsec), gas.y.value_in(units.parsec), s=1, label="gas")
-    plt.scatter(
-        bodies.x.value_in(units.parsec), bodies.y.value_in(units.parsec), s=1, label="stars"
-    )
-    plt.scatter(
-        bodies[np.argmax(bodies.mass)].x.value_in(units.parsec),
-        bodies[np.argmax(bodies.mass)].y.value_in(units.parsec),
-        s=5,
-        c="red"
-    )
-    plt.legend()
-    plt.xlim(-5, 5)
-    plt.ylim(-5, 5)
-    plt.xlabel("parsec")
-    plt.ylabel("parsec")
-    plt.show()
-
-def star_control(bodies, n_stars):
+def star_control(bodies):
     bodies_pd = pd.DataFrame(np.array(bodies.stellar_type.number), columns=["stellar_type"])
     return list(bodies_pd.value_counts().index[-1])[0]
 
@@ -310,7 +271,7 @@ def simulate(gravity, hydro, gravhydro, evolution, wind, channel, bodies, gas, t
     return gravity, hydro, gravhydro, evolution, wind, bodies, gas
 
 
-def print_info(gravity_initial_total_energy, gravity, hydro, gas, i, start_mass, bodies, t, mgas):
+def print_info(gravity_initial_total_energy, gravity, hydro, gas, i, start_mass, bodies, t,):
     dE_gravity = gravity_initial_total_energy/(gravity.get_total_energy()+hydro.get_total_energy())
     print("dE:", dE_gravity, "; t=", t)
     current_gasmass = np.sum(gas.mass)
@@ -325,160 +286,10 @@ def print_info(gravity_initial_total_energy, gravity, hydro, gas, i, start_mass,
     print("Total mass:", np.sum(bodies.mass) | units.MSun)
 
 
-# print(dir(gas))
-def gravity_hydro_bridge(gravity, hydro, gravhydro, evolution, wind, channel, bodies, gas, t_end, dt, dt_bridge, n_stars, gasmass, run):
-    # dt_SN = 0.01 | units.Myr
-    t_steps = np.arange(0, t_end.value_in(units.Myr), dt.value_in(units.Myr)) | units.Myr
-
-    Us = []
-    Ks = []
-    Ts = []
-    gas_oldpos = []
-    gas_oldvel = []
-    stars_oldpos = []
-    stars_oldvel = []
-
-
-    for i, t in enumerate(tqdm(t_steps)):
-        gravity, hydro, gravhydro, evolution, wind, bodies, gas = simulate(gravity, hydro, gravhydro, evolution, wind, channel, bodies, gas, t)
-
-        U = bodies.potential_energy() + gas.potential_energy()
-        K = bodies.kinetic_energy() + gas.kinetic_energy()
-
-        Us.append(abs(U.value_in(units.m**2 * units.kg * units.s**-2)))
-        Ks.append(abs(K.value_in(units.m**2 * units.kg * units.s**-2)))
-        Ts.append(t.value_in(units.Myr))
-        gas_oldpos.append(gas.position)
-        gas_oldvel.append(gas.velocity)
-        stars_oldpos.append(bodies.position)
-        stars_oldvel.append(bodies.velocity)
-
-        # print_info(gravity_initial_total_energy, gravity, hydro, gas, i, start_mass, bodies, t)
-
-        if star_control(bodies, n_stars) == 4:
-            hydro.parameters.timestep = 0.0004 | units.Myr #400 jaar
-            gravhydro.timestep = 0.0002 | units.Myr
-    
-    # t_steps_supernova = np.arange(t_SN.value_in(units.Myr), t_SN.value_in(units.Myr) + 2, dt_SN.value_in(units.Myr)) | units.Myr
-    # for i, t in enumerate(tqdm(t_steps_supernova)):
-    #     gravity, hydro, gravhydro, evolution, wind, bodies, gas = simulate(gravity, hydro, gravhydro, evolution, wind, channel, bodies, gas, t)
-
-        
-    #     U = bodies.potential_energy() + gas.potential_energy()
-    #     K = bodies.kinetic_energy() + gas.kinetic_energy()
-
-    #     Us.append(abs(U.value_in(units.m**2 * units.kg * units.s**-2)))
-    #     Ks.append(abs(K.value_in(units.m**2 * units.kg * units.s**-2)))
-    #     Ts.append(t.value_in(units.Myr))
-    #     gas_oldpos.append(gas.position)
-    #     gas_oldvel.append(gas.velocity)
-    #     stars_oldpos.append(bodies.position)
-    #     stars_oldvel.append(bodies.velocity)
-
-        # print_info(gravity_initial_total_energy, gravity, hydro, gas, i, start_mass, bodies, t)
-
-    
-
-    evolution.stop()
-    gravity.stop()
-    hydro.stop()
-
-    np.save("./data/potential_energy_ratio{}_run{}.npy".format(gasmass, run), Us)
-    np.save("./data/kinetic_energy_ratio{}_run{}.npy".format(gasmass, run), Ks)
-    np.save("./data/times_ratio{}_run{}.npy".format(gasmass, run), Ts)
-    np.save("./data/gaspositions_ratio{}_run{}.npy".format(gasmass, run), gas_oldpos)
-    np.save("./data/gasvelocities_ratio{}_run{}.npy".format(gasmass, run), gas_oldvel)
-    np.save("./data/starpositions_ratio{}_run{}.npy".format(gasmass, run), stars_oldpos)
-    np.save("./data/starvelocities_ratio{}_run{}.npy".format(gasmass, run), stars_oldvel)
-    
-    
-
-def init_stars(n_stars=10, alpha_IMF=-2.35):
-    #create stars with masses, positions and velocities and put them in the ph4 module
-    while True:
-        m_stars = new_salpeter_mass_distribution(n_stars, 0.1|units.MSun, 100|units.MSun, alpha_IMF)
-        masslist = np.sort(m_stars)
-        if masslist[-1].value_in(units.MSun) > 27 and masslist[-1].value_in(units.MSun) < 33 and masslist[-2].value_in(units.MSun) < 27:
-            break
-    print("max mass star:", m_stars[np.argmax(m_stars)])
-    return m_stars
-
 def main(gasmass, run):
-    dt = 0.1 | units.Myr
-    dt_winds = 0.05 | units.Myr
-    dt_hydro = 0.04 | units.Myr
-    dt_bridge = 0.02 | units.Myr  #1.0*Pinner
-    n_stars=10
-    
-    m_stars = init_stars(n_stars)
-    total_mass = np.sum(m_stars)
-
-    r_cluster = 1.0 | units.parsec
-    gravconverter=nbody_system.nbody_to_si(total_mass, r_cluster)
-
-    bodies=new_fractal_cluster_model(n_stars,fractal_dimension= 1.6, convert_nbody=gravconverter)
-    bodies.scale_to_standard(gravconverter)
-    bodies.mass = m_stars
-    SNstar = bodies[np.argmax(bodies.mass)]
-    gravity = ph4(gravconverter)
-    gravity.particles.add_particles(bodies)
-
-
-    ## Maak gasdeeltjes
-    Ngas = 1000  # 10000
-    total_gas_mass = gasmass*total_mass
-    gasconverter=nbody_system.nbody_to_si(total_gas_mass+total_mass,r_cluster)
-    gas = new_plummer_gas_model(Ngas, convert_nbody=gasconverter)
-    # gas.scale_to_standard(gasconverter)
-
-    gas = create_swiss_cheese_gas(gas, bodies)
-
-
-    #create a hydro code and a gas distribution and put the gas in the hydro code
-    hydro = Fi(gravconverter, mode='g6lib')
-    hydro.parameters.gamma = 1
-    hydro.parameters.isothermal_flag = True
-    hydro.parameters.integrate_entropy_flag = False
-    hydro.parameters.timestep = dt_hydro
-    hydro.parameters.verbosity = 0
-    hydro.parameters.eps_is_h_flag = False    # h_smooth is constant
-    eps = 0.1 | units.au
-    hydro.parameters.gas_epsilon = eps
-    hydro.parameters.sph_h_const = eps
-
-    hydro.particles.add_particles(gas)
-    Mgas = np.sum(gas.mass)
-    mgas = Mgas/Ngas
-
-
-    #bridge the codes
-    gravhydro = bridge.Bridge(use_threading=False) #, method=SPLIT_4TH_S_M4)
-    gravhydro.add_system(gravity, (hydro,))
-    gravhydro.add_system(hydro, (gravity,))
-    gravhydro.timestep = dt_bridge # min 2x de output timestep
-
-
-
-    # Stellar evolution
-    evolution = SeBa()
-    evolution.particles.add_particles(bodies)
-
-    # Stellar wind  p. 223
-    wind = new_stellar_wind(mgas, target_gas=gas, timestep=dt_winds, derive_from_evolution=True)
-    wind.particles.add_particles(bodies)
-
-
-    channel = {"from_stars": bodies.new_channel_to(gravity.particles),
-                "to_stars": gravity.particles.new_channel_to(bodies),
-                "from_gas": gas.new_channel_to(hydro.particles),
-                "to_gas": hydro.particles.new_channel_to(gas),
-                "evo_to_grav": evolution.particles.new_channel_to(gravity.particles),
-                "evo_to_stars": evolution.particles.new_channel_to(bodies),
-                "stars_to_wind": bodies.new_channel_to(wind.particles)
-                }
-
-    t_end = 10.0 | units.Myr
-    gravity_hydro_bridge(gravity, hydro, gravhydro, evolution, wind, channel, bodies, gas, t_end, dt, dt_bridge, n_stars, gasmass, run)
+    '''Run the simulation with standard parameters.'''
+    my_simulation = Clustersimulation(gasmass, run)
+    my_simulation.gravity_hydro_bridge()
     return 0
 
 

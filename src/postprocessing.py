@@ -6,8 +6,8 @@ from matplotlib import animation
 filestring = ""
 filestring = "_ratio{}_run{}".format(5, "test")
 
-kinetic_energies = np.load("./data/kinetic_energy{}.npy".format(filestring), allow_pickle=True)
-potential_energies = np.load("./data/potential_energy{}.npy".format(filestring), allow_pickle=True)
+kinetic_energies = np.load("./data/kinetic{}.npy".format(filestring), allow_pickle=True)
+potential_energies = np.load("./data/potential{}.npy".format(filestring), allow_pickle=True)
 times = np.load("./data/times{}.npy".format(filestring), allow_pickle=True)
 gaspositions = np.load("./data/gaspositions{}.npy".format(filestring), allow_pickle=True)
 gasvelocities = np.load("./data/gasvelocities{}.npy".format(filestring), allow_pickle=True)
@@ -17,10 +17,10 @@ starvelocities = np.load("./data/starvelocities{}.npy".format(filestring), allow
 #find time at which supernova starts
 SNtime = 0 | units.Myr
 for i in range(len(gasvelocities)):
+    # print(len(gasvelocities[i]))
     if len(gasvelocities[i]) > len(gasvelocities[0]):
         SNtime = times[i]
         break
-
 
 def plot_avg_velocities():
     plt.figure()
@@ -101,7 +101,7 @@ def make_animation(frame):
     ax.set_xlabel("parsec")
     ax.set_ylabel("parsec")
     
-    #stupid amuse quantities dont work so we have to iterate by hand to convert units
+    #for some reason array has quantity elements instead of being a quantity vector so we have to iterate by hand to convert units
     starpos = np.zeros((len(starpositions[0]), 3))
     for i in range(len(starpositions[frame])):
         starpos[i,0] = starpositions[frame][i,0].value_in(units.parsec)
@@ -113,18 +113,18 @@ def make_animation(frame):
 
 fig, ax = plt.subplots()
 anim = animation.FuncAnimation(fig, make_animation, frames=len(times))
-writer = animation.FFMpegWriter(fps=len(gasvelocities)/10.)
+writer = animation.FFMpegWriter(fps=len(gasvelocities)/20.)
 anim.save("./figures/animation.mp4", writer=writer)
 
-fig, ax = plt.subplots()
-anim = animation.FuncAnimation(fig, make_pos_hist, frames=len(times))
-writer = animation.FFMpegWriter(fps=len(gasvelocities)/10.)
-anim.save("./figures/pos_hist.mp4", writer=writer)
+# fig, ax = plt.subplots()
+# anim = animation.FuncAnimation(fig, make_pos_hist, frames=len(times))
+# writer = animation.FFMpegWriter(fps=len(gasvelocities)/20.)
+# anim.save("./figures/pos_hist.mp4", writer=writer)
 
-fig, ax = plt.subplots()
-anim = animation.FuncAnimation(fig, make_vel_hist, frames=len(times))
-writer = animation.FFMpegWriter(fps=len(gasvelocities)/10.)
-anim.save("./figures/vel_hist.mp4", writer=writer)
+# fig, ax = plt.subplots()
+# anim = animation.FuncAnimation(fig, make_vel_hist, frames=len(times))
+# writer = animation.FFMpegWriter(fps=len(gasvelocities)/20.)
+# anim.save("./figures/vel_hist.mp4", writer=writer)
 
 plot_avg_positions()
 plot_avg_velocities()

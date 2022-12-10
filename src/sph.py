@@ -21,8 +21,11 @@ from amuse.ext.salpeter import new_salpeter_mass_distribution
 from amuse.ext.stellar_wind import new_stellar_wind
 from amuse.lab import new_plummer_gas_model
 from amuse.units import (units, nbody_system)
+from amuse.ext.molecular_cloud import molecular_cloud
 
 # np.random.seed(1)
+
+
 
 
 def fix_cwd():
@@ -40,6 +43,7 @@ class Clustersimulation:
     """Simulation class."""
 
     def __init__(self, gasmass, run):
+        self.evostars = False
         self.gasmass = gasmass
         self.run = run
         self.dt = 0.1 | units.Myr
@@ -47,14 +51,15 @@ class Clustersimulation:
         self.dt_hydro = 0.04 | units.Myr
         self.dt_bridge = 0.02 | units.Myr  #1.0*Pinner
         # self.dt_SN = 0.01 | units.Myr
-        self.n_stars=10
+        self.n_stars = 100
         self.n_gas = 1000  # 10000
         self.r_cluster = 1.0 | units.parsec
-        self.t_end = 10.0 | units.Myr
+        self.t_end = 30.0 | units.Myr
+        self.settle_time = self.t_end - (10.0|units.Myr)
 
         gravconverter = self.init_stars()
         ## Maak gasdeeltjes
-        gasconverter=nbody_system.nbody_to_si(6*self.total_mass, self.r_cluster)
+        gasconverter=nbody_system.nbody_to_si((self.gasmass+1)*self.total_mass, self.r_cluster*2)
         self.gas = self.create_swiss_cheese_gas(gasconverter)
 
         self.hydrocode(gravconverter)
@@ -155,7 +160,8 @@ class Clustersimulation:
         newgas
             The new swiss cheese gas distribution.
         """
-        gas = new_plummer_gas_model(self.n_gas, convert_nbody=gasconverter)
+        # gas = new_plummer_gas_model(self.n_gas, convert_nbody=gasconverter)
+        gas = molecular_cloud(targetN=self.n_gas, convert_nbody=gasconverter).result
 
         tryradii = np.logspace(np.log10(0.001), np.log10(1), 50) | units.parsec
         sorted_stars = np.sort(self.bodies.mass)
@@ -180,6 +186,9 @@ class Clustersimulation:
         starpos = []
         starvel = []
 
+        last_gascount = len(self.gas)
+        gascount_at_SN = len(self.gas)
+
         for timestamp in tqdm(t_steps):
             self.simulate_timestamp(timestamp)
 
@@ -194,10 +203,21 @@ class Clustersimulation:
             starpos.append(self.bodies.position)
             starvel.append(self.bodies.velocity)
 
-            if star_control(self.bodies) == 4:
-                t_SN = timestamp
-                self.hydro.parameters.timestep = 0.004 | units.Myr
-                self.gravhydro.timestep = 0.002 | units.Myr
+            #als het aantal deeltjes stijgt totdat het onder het originele niveau
+            if len(self.gas) > last_gascount or len(self.gas) > gascount_at_SN:
+                print("star type: {}, time: {}".format(star_control(self.bodies), timestamp))
+                self.hydro.parameters.timestep = 0.001 | units.Myr
+                self.gravhydro.timestep = 0.0005 | units.Myr
+            else:
+                # print("star type: {}, time: {}".format(star_control(self.bodies), timestamp))
+                self.hydro.parameters.timestep = 0.04 | units.Myr
+                self.gravhydro.timestep = 0.02 | units.Myr
+                gascount_at_SN = len(self.gas)
+
+            if timestamp > self.settle_time:
+                self.evostars = True
+
+            last_gascount = len(self.gas)
 
         # t_steps_supernova = np.arange(
         #     t_SN.value_in(units.Myr), t_SN.value_in(units.Myr) + 3, self.dt_SN.value_in(units.Myr)
@@ -227,11 +247,12 @@ class Clustersimulation:
         np.save("./data/gasvelocities{}.npy".format(filestring), gasvel)
         np.save("./data/starpositions{}.npy".format(filestring), starpos)
         np.save("./data/starvelocities{}.npy".format(filestring), starvel)
-        
+
 
     def simulate_timestamp(self, timestamp):
         '''Run the simulating to the given timestamp.'''
-        self.evolution.evolve_model(timestamp)
+        if self.evostars:
+            self.evolution.evolve_model(timestamp - self.settle_time)
         self.channel["evo_to_grav"].copy()
         self.channel["evo_to_stars"].copy()
         self.channel["stars_to_wind"].copy()      # wind with hydro and grav: Book 8.1.1 p.323
@@ -254,21 +275,6 @@ def delete_outofbounds(gas):
     selection = gas[mask]
     gas.remove_particles(selection)
     return gas
-
-
-
-def simulate(gravity, hydro, gravhydro, evolution, wind, channel, bodies, gas, t):
-    evolution.evolve_model(t)
-    channel["evo_to_grav"].copy()
-    channel["evo_to_stars"].copy()
-    channel["stars_to_wind"].copy()      # wind with hydro and grav: Book 8.1.1 p.323
-    wind.evolve_model(t)
-    gas = delete_outofbounds(gas)
-    gas.synchronize_to(hydro.particles)
-    gravhydro.evolve_model(t)
-    channel["to_stars"].copy()
-    channel["to_gas"].copy()
-    return gravity, hydro, gravhydro, evolution, wind, bodies, gas
 
 
 def print_info(gravity_initial_total_energy, gravity, hydro, gas, i, start_mass, bodies, t,):

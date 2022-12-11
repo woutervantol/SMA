@@ -1,0 +1,45 @@
+Opening
+Introduction to the problem
+Background information
+Research question
+Approach
+ - Gravity code
+ - Hydro code
+ - Stellar winds links to hydro code (and is derived from the bodies)
+ - Stellar evolution links to the bodies (SeBa())
+Parameters: what are they and why did we choose them
+ - Initialization:
+   - Bodies initialization:
+     - Fractal distribution
+     - Number of bodies
+     - Salpeter mass distribution
+     - Setting heaviest star mass for consistent supernova forming
+     - cluster radius
+   - Gas initialization:
+     - Plummer sphere
+     - number of gas particles
+     - create cheese based on star mass, to sort of simulate star forming
+   - Star mass/gas mass ratio and its effect
+   - Wait for virial equilibrium, then start the process
+ - Timesteps
+ - ?
+
+When we run the code
+ - Video of the simulation
+ - Specify moment of supernova
+ - Note the wind you see flying and possibly accelerated gas particles.
+
+Post processing
+ - What actually happened?
+ - Looking at total energy
+	 - Perhaps comparing situation without stellar winds and with stellar winds
+ - Number of original gas particles
+ - Looking at gas velocities
+ - Looking at body velocities?
+
+Conclusion:
+ - What is the actual effect of the winds?
+ - With this, can we say something about the two branches of stellar clusters?
+ - What is the effect of stellar wind, and in particular a supernova on the boundness of a stellar cluster?
+
+ - Deleting out of bounds particles

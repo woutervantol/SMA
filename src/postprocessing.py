@@ -112,9 +112,7 @@ times = np.load("./data/times{}.npy".format(filestring), allow_pickle=True)
 gas_indices = np.load("./data/gas_indices{}.npy".format(filestring), allow_pickle=True)
 for i in range(len(times)):
     times[i] = times[i].value_in(units.Myr)
-plt.scatter(gas[0].x[:gas_indices[0]+1].value_in(units.parsec), gas[0].y[:gas_indices[0]+1].value_in(units.parsec), s=0.5, label="Gas", alpha=0.5)
-plt.scatter(bodies[0].x.value_in(units.parsec), bodies[0].y.value_in(units.parsec), s=3, label="Stars")
-plt.show()
+
 #find time at which supernova starts
 SNtime = 0 | units.Myr
 for i in range(1, len(times)):

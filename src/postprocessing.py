@@ -3,22 +3,25 @@ import matplotlib.pyplot as plt
 from amuse.units import units
 from matplotlib import animation
 
-# times = np.load("./data/times_ratio1_run0.npy", allow_pickle=True)
+# times = np.load("./data/veelsims/times_ratio1_run0.npy", allow_pickle=True)
 # for i in range(len(times)):
 #     times[i] = times[i].value_in(units.Myr)
 
-# runs_per_gasmass = np.arange(0, 20)
-# gas_mass_ratios = [25]
+# runs_per_gasmass = [6, 7, 8, 12, 20, 24, 25, 27, 28]
+# gas_mass_ratios = [5]
 # for gasmass in gas_mass_ratios:
 #     avg_pos = np.zeros(len(times))
 #     avg_vel = np.zeros(len(times))
 #     for run in runs_per_gasmass:
 #         filestring = "_ratio{}_run{}".format(gasmass, run)
 
-#         gas = np.load("./data/gas{}.npy".format(filestring), allow_pickle=True)
-#         bodies = np.load("./data/bodies{}.npy".format(filestring), allow_pickle=True)
+#         gas = np.load("./data/veelsims/gas{}.npy".format(filestring), allow_pickle=True)
+#         bodies = np.load("./data/veelsims/bodies{}.npy".format(filestring), allow_pickle=True)
 #         # times = np.load("./data/times{}.npy".format(filestring), allow_pickle=True)
-#         gas_indices = np.load("./data/gas_indices{}.npy".format(filestring), allow_pickle=True)
+#         gascomp = np.load("./data/veelsims/compgas{}.npy".format(filestring), allow_pickle=True)
+#         bodiescomp = np.load("./data/veelsims/compbodies{}.npy".format(filestring), allow_pickle=True)
+
+#         gas_indices = np.load("./data/veelsims/gas_indices{}.npy".format(filestring), allow_pickle=True)
 
 #         SNtime = 0 | units.Myr
 #         for i in range(1, len(times)):
@@ -28,9 +31,46 @@ from matplotlib import animation
 #                 # break
 #         print(SNtime)
 
-#         # for i in range(len(times)):
-#         #     avg_pos[i] += np.average(gas[i].position.lengths().value_in(units.parsec))
-#         #     avg_vel[i] += np.average(gas[i].velocity.lengths().value_in(units.ms))
+#         Us = []
+#         Uscomp = []
+#         Ks = []
+#         Kscomp = []
+#         for t in range(len(times)):
+#             print(t)
+#             #stars
+#             # Us.append(-bodies[t].potential_energy().value_in(units.m**2 * units.kg * units.s**-2))
+#             # Uscomp.append(-bodiescomp[t].potential_energy().value_in(units.m**2 * units.kg * units.s**-2))
+#             # Ks.append(bodies[t].kinetic_energy().value_in(units.m**2 * units.kg * units.s**-2))
+#             # Kscomp.append(bodiescomp[t].kinetic_energy().value_in(units.m**2 * units.kg * units.s**-2))
+#             #gas
+#             # Us.append(-gas[t][:gas_indices[t]].potential_energy().value_in(units.m**2 * units.kg * units.s**-2))
+#             # Uscomp.append(-gascomp[t].potential_energy().value_in(units.m**2 * units.kg * units.s**-2))
+#             # Ks.append(gas[t][:gas_indices[t]].kinetic_energy().value_in(units.m**2 * units.kg * units.s**-2))
+#             # Kscomp.append(gascomp[t].kinetic_energy().value_in(units.m**2 * units.kg * units.s**-2))
+#             #both
+#             Us.append(-gas[t][:gas_indices[t]].potential_energy().value_in(units.m**2 * units.kg * units.s**-2) - bodies[t].potential_energy().value_in(units.m**2 * units.kg * units.s**-2))
+#             # Uscomp.append(-gascomp[t].potential_energy().value_in(units.m**2 * units.kg * units.s**-2) - bodiescomp[t].potential_energy().value_in(units.m**2 * units.kg * units.s**-2))
+#             Ks.append(gas[t][:gas_indices[t]].kinetic_energy().value_in(units.m**2 * units.kg * units.s**-2) + bodies[t].kinetic_energy().value_in(units.m**2 * units.kg * units.s**-2))
+#             # Kscomp.append(gascomp[t].kinetic_energy().value_in(units.m**2 * units.kg * units.s**-2) + bodiescomp[t].kinetic_energy().value_in(units.m**2 * units.kg * units.s**-2))
+#         plt.figure()
+#         plt.semilogy(times, Us, label="Potential energy")
+#         # plt.semilogy(times, Uscomp, label="Potential energy without winds")
+#         plt.semilogy(times, Ks, label="Kinetic energy")
+#         # plt.semilogy(times, Kscomp, label="Kinetic energy without winds")
+#         # plt.plot(times, np.array(Ks) - np.array(Us))
+
+#         # plt.title("Energy comparison{} {}".format(gasmass, run))
+#         plt.xlabel("Time (Myr)")
+#         plt.ylabel("Energy (m^2 kg s^-2)")
+#         plt.axvline(SNtime, 0, 1, color="black", linestyle="dashed", label="Start supernova")
+#         plt.axvline(20, 0, 1, color="gray", linestyle="dashed", label="Start SeBa")
+#         plt.legend()
+#         plt.show()
+
+
+        # for i in range(len(times)):
+        #     avg_pos[i] += np.average(gas[i].position.lengths().value_in(units.parsec))
+        #     avg_vel[i] += np.average(gas[i].velocity.lengths().value_in(units.ms))
 #     print(gasmass)
 #     avg_pos /= len(runs_per_gasmass)
 #     avg_vel /= len(runs_per_gasmass)
@@ -65,18 +105,23 @@ bodies = np.load("./data/bodies{}.npy".format(filestring), allow_pickle=True)
 gascomp = np.load("./data/gas{}.npy".format(filestringcomp), allow_pickle=True)
 bodiescomp = np.load("./data/bodies{}.npy".format(filestringcomp), allow_pickle=True)
 
+
+    
+
 times = np.load("./data/times{}.npy".format(filestring), allow_pickle=True)
 gas_indices = np.load("./data/gas_indices{}.npy".format(filestring), allow_pickle=True)
 for i in range(len(times)):
     times[i] = times[i].value_in(units.Myr)
-
+plt.scatter(gas[0].x[:gas_indices[0]+1].value_in(units.parsec), gas[0].y[:gas_indices[0]+1].value_in(units.parsec), s=0.5, label="Gas", alpha=0.5)
+plt.scatter(bodies[0].x.value_in(units.parsec), bodies[0].y.value_in(units.parsec), s=3, label="Stars")
+plt.show()
 #find time at which supernova starts
 SNtime = 0 | units.Myr
 for i in range(1, len(times)):
     # print(len(gas[i]), times[i])
     if len(gas[i]) > len(gas[i-1]):
         SNtime = times[i]
-        break
+        # break
 print(SNtime)
 
 def plot_avg_velocities():
@@ -89,7 +134,8 @@ def plot_avg_velocities():
     plt.title("Gas velocity comparison")
     plt.xlabel("Time (Myr)")
     plt.ylabel("Average gas velocity (m/s)")
-    plt.vlines(SNtime, np.min(vels), np.max(vels), color="black", linestyle="dashed")
+    plt.axvline(SNtime, 0, 1, color="black", linestyle="dashed", label="Start supernova")
+    plt.axvline(25, 0, 1, color="gray", linestyle="dashed", label="Start SeBa")
     plt.plot(times, vels, label="With wind")
     plt.plot(times, velscomp, label="Without wind")
     plt.legend()
@@ -105,7 +151,8 @@ def plot_avg_positions():
     plt.title("Gas position comparison")
     plt.xlabel("Time (Myr)")
     plt.ylabel("Average gas position (parsec)")
-    plt.vlines(SNtime, np.min(poss), np.max(poss), color="black", linestyle="dashed")
+    plt.axvline(SNtime, 0, 1, color="black", linestyle="dashed", label="Start supernova")
+    plt.axvline(25, 0, 1, color="gray", linestyle="dashed", label="Start SeBa")
     plt.plot(times, poss, label="With wind")
     plt.plot(times, posscomp, label="Without wind")
     plt.legend()
@@ -141,20 +188,11 @@ def plot_energies():
     plt.title("Energy comparison")
     plt.xlabel("Time (Myr)")
     plt.ylabel("Energy (m^2 kg s^-2)")
-    # plt.vlines(SNtime, np.min(Ks), np.max(Ks), color="black", linestyle="dashed")
+    plt.axvline(SNtime, 0, 1, color="black", linestyle="dashed", label="Start supernova")
+    plt.axvline(25, 0, 1, color="gray", linestyle="dashed", label="Start SeBa")
     plt.legend()
     plt.savefig("./figures/energy.png")
 
-    # plt.figure()
-    # data = []
-    # for t in range(len(times)):
-    #     data.append(Ks[t]/Us[t])
-    # plt.semilogy(times, data)
-    # plt.vlines(SNtime, np.min(data), np.max(data), color="black", linestyle="dashed")
-    # plt.title("boundness energy")
-    # plt.xlabel("Time (Myr)")
-    # plt.ylabel("Energy ratio between kinetic and potential energy")
-    # plt.savefig("./figures/energy_rel.png")
 
 def make_animation(frame):
     print(frame)
@@ -196,12 +234,12 @@ def make_columndensity(frame):
     ax.scatter(bodies[frame].x.value_in(units.parsec), bodies[frame].y.value_in(units.parsec), s=3, label="Stars")
 
 
-fig, ax = plt.subplots(2)
-ax[0].set_box_aspect(1)
-ax[1].set_box_aspect(1)
-anim = animation.FuncAnimation(fig, make_animation, frames=len(times))
-writer = animation.FFMpegWriter(fps=len(times)/20.)
-anim.save("./figures/animation.mp4", writer=writer)
+# fig, ax = plt.subplots(2)
+# ax[0].set_box_aspect(1)
+# ax[1].set_box_aspect(1)
+# anim = animation.FuncAnimation(fig, make_animation, frames=len(times))
+# writer = animation.FFMpegWriter(fps=len(times)/20.)
+# anim.save("./figures/animation.mp4", writer=writer)
 
 # fig, ax = plt.subplots()
 # anim = animation.FuncAnimation(fig, make_columndensity, frames=len(times))

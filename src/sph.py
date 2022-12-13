@@ -43,7 +43,7 @@ class Clustersimulation:
     """Simulation class."""
 
     def __init__(self, gasmass, run):
-        self.load = True
+        self.load = False
         self.evostars = False
         self.gasmass = gasmass
         self.run = run
@@ -52,25 +52,36 @@ class Clustersimulation:
         self.dt_hydro = 0.04 | units.Myr
         self.dt_bridge = 0.02 | units.Myr  #1.0*Pinner
         # self.dt_SN = 0.01 | units.Myr
-        self.n_stars = 10
-        self.n_gas = 1000  # 10000
+        self.n_stars = 1000
+        self.n_gas = 10000
         self.r_cluster = 1.0 | units.parsec
         self.t_end = 50.0 | units.Myr
         self.settle_time = self.t_end - (25.0|units.Myr)
 
         gravconverter = self.init_stars()
         ## Maak gasdeeltjes
-        gasconverter=nbody_system.nbody_to_si((self.gasmass+1)*self.total_mass, self.r_cluster*2)
+        gasconverter=nbody_system.nbody_to_si(1|units.kg, self.r_cluster*2)
         if not self.load:
             self.gas = self.create_swiss_cheese_gas(gasconverter)
         else:
             self.gas = np.load("./data/initgas.npy", allow_pickle=True)[0]
-        self.lastgas = self.gas[-1]
+        # print(type(self.gas))
+        # self.gas.remove(self.gas)
+        # print(self.gas)
+        # # self.lastgas = self.gas[-1]
+
+        plt.scatter(self.gas.x.value_in(units.parsec), self.gas.y.value_in(units.parsec), s=0.5, label="Gas", alpha=0.5)
+        plt.scatter(self.bodies.x.value_in(units.parsec), self.bodies.y.value_in(units.parsec), s=3, label="Stars")
+        plt.xlabel("Parsec")
+        plt.ylabel("Parsec")
+        plt.title("Fractal example")
+        plt.show()
 
         if not self.load:
             np.save("./data/initgas.npy", [self.gas])
             np.save("./data/initbodies.npy", [self.bodies])
             addasdas
+            
 
         
         self.hydrocode(gravconverter)
@@ -249,10 +260,10 @@ class Clustersimulation:
             self.evolution.evolve_model(timestamp - self.settle_time)
         self.channel["evo_to_grav"].copy()
         self.channel["evo_to_stars"].copy()
-        # self.channel["stars_to_wind"].copy()      # wind with hydro and grav: Book 8.1.1 p.323
-        # self.wind.evolve_model(timestamp)
+        self.channel["stars_to_wind"].copy()      # wind with hydro and grav: Book 8.1.1 p.323
+        self.wind.evolve_model(timestamp)
         self.gas = delete_outofbounds(self.gas)
-        # self.gas.synchronize_to(self.hydro.particles)
+        self.gas.synchronize_to(self.hydro.particles)
         self.gravhydro.evolve_model(timestamp)
         self.channel["to_stars"].copy()
         self.channel["to_gas"].copy()
@@ -295,12 +306,12 @@ def main(gasmass, run):
 
 if __name__ == "__main__":
     fix_cwd()
-    # runs_per_gasmass = np.arange(24, 50)
-    # gas_mass_ratios = [25]
-    # for gasmass in gas_mass_ratios:
-    #     for run in runs_per_gasmass:
-    #         main(gasmass, run)
-    exit(main(5, "finalcomp"))
+    runs_per_gasmass = np.arange(0, 10)
+    gas_mass_ratios = [5]
+    for gasmass in gas_mass_ratios:
+        for run in runs_per_gasmass:
+            main(gasmass, "{}".format(run))
+    # exit(main(5, "finalcomp2"))
 
 
 # Interessant boek? https://misaladino.com/wp-content/uploads/2019/11/Thesis_Martha_Irene.pdf

@@ -26,6 +26,11 @@ from amuse.ext.molecular_cloud import molecular_cloud
 # np.random.seed(1)
 
 
+# dist = 0.2 | units.parsec
+# speed = 200 | units.kms
+# time = dist/speed
+# print(time.value_in(units.Myr))
+# dasdas
 
 
 def fix_cwd():
@@ -43,20 +48,20 @@ class Clustersimulation:
     """Simulation class."""
 
     def __init__(self, gasmass, run):
-        self.load = False
+        self.load = True
         self.evostars = False
         self.gasmass = gasmass
         self.run = run
-        self.dt = 0.1 | units.Myr
-        self.dt_winds = 0.05 | units.Myr
-        self.dt_hydro = 0.04 | units.Myr
-        self.dt_bridge = 0.02 | units.Myr  #1.0*Pinner
+        self.dt = 0.001 | units.Myr
+        self.dt_winds = 0.001 | units.Myr
+        self.dt_hydro = 0.001 | units.Myr
+        self.dt_bridge = 0.002 | units.Myr  #1.0*Pinner
         # self.dt_SN = 0.01 | units.Myr
-        self.n_stars = 1000
-        self.n_gas = 10000
+        self.n_stars = 10
+        self.n_gas = 100
         self.r_cluster = 1.0 | units.parsec
-        self.t_end = 50.0 | units.Myr
-        self.settle_time = self.t_end - (25.0|units.Myr)
+        self.t_end = 10.0 | units.Myr
+        self.settle_time = self.t_end - (10.0|units.Myr)
 
         gravconverter = self.init_stars()
         ## Maak gasdeeltjes
@@ -65,17 +70,6 @@ class Clustersimulation:
             self.gas = self.create_swiss_cheese_gas(gasconverter)
         else:
             self.gas = np.load("./data/initgas.npy", allow_pickle=True)[0]
-        # print(type(self.gas))
-        # self.gas.remove(self.gas)
-        # print(self.gas)
-        # # self.lastgas = self.gas[-1]
-
-        plt.scatter(self.gas.x.value_in(units.parsec), self.gas.y.value_in(units.parsec), s=0.5, label="Gas", alpha=0.5)
-        plt.scatter(self.bodies.x.value_in(units.parsec), self.bodies.y.value_in(units.parsec), s=3, label="Stars")
-        plt.xlabel("Parsec")
-        plt.ylabel("Parsec")
-        plt.title("Fractal example")
-        plt.show()
 
         if not self.load:
             np.save("./data/initgas.npy", [self.gas])
@@ -132,7 +126,7 @@ class Clustersimulation:
         # p. 223
         mgas = np.sum(self.gas.mass)/self.n_gas
         self.wind = new_stellar_wind(
-            mgas/100, target_gas=self.gas, timestep=self.dt_winds, derive_from_evolution=True
+            mgas/10000, target_gas=self.gas, timestep=self.dt_winds, derive_from_evolution=True
         )
         self.wind.particles.add_particles(self.bodies)
 
@@ -228,13 +222,11 @@ class Clustersimulation:
 
             #als het aantal deeltjes stijgt totdat het onder het originele niveau
             if len(self.gas) > last_gascount or len(self.gas) > gascount_at_SN:
-                # print("star type: {}, time: {}".format(star_control(self.bodies), timestamp))
-                self.hydro.parameters.timestep = 0.001 | units.Myr
-                self.gravhydro.timestep = 0.0005 | units.Myr
+                self.hydro.parameters.timestep = self.dt_hydro / 10
+                self.gravhydro.timestep = self.dt_bridge / 10
             else:
-                # print("star type: {}, time: {}".format(star_control(self.bodies), timestamp))
-                self.hydro.parameters.timestep = 0.04 | units.Myr
-                self.gravhydro.timestep = 0.02 | units.Myr
+                self.hydro.parameters.timestep = self.dt_hydro
+                self.gravhydro.timestep = self.dt_bridge
                 gascount_at_SN = len(self.gas)
 
             if timestamp > self.settle_time:
@@ -306,12 +298,12 @@ def main(gasmass, run):
 
 if __name__ == "__main__":
     fix_cwd()
-    runs_per_gasmass = np.arange(0, 10)
-    gas_mass_ratios = [5]
-    for gasmass in gas_mass_ratios:
-        for run in runs_per_gasmass:
-            main(gasmass, "{}".format(run))
-    # exit(main(5, "finalcomp2"))
+    # runs_per_gasmass = np.arange(0, 10)
+    # gas_mass_ratios = [5]
+    # for gasmass in gas_mass_ratios:
+    #     for run in runs_per_gasmass:
+    #         main(gasmass, "{}".format(run))
+    exit(main(5, "windtest"))
 
 
 # Interessant boek? https://misaladino.com/wp-content/uploads/2019/11/Thesis_Martha_Irene.pdf

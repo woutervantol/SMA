@@ -57,8 +57,8 @@ class Clustersimulation:
         self.dt_hydro = 0.001 | units.Myr
         self.dt_bridge = 0.002 | units.Myr  #1.0*Pinner
         # self.dt_SN = 0.01 | units.Myr
-        self.n_stars = 10
-        self.n_gas = 100
+        self.n_stars = 5
+        self.n_gas = 50
         self.r_cluster = 1.0 | units.parsec
         self.t_end = 10.0 | units.Myr
         self.settle_time = self.t_end - (10.0|units.Myr)
@@ -70,11 +70,12 @@ class Clustersimulation:
             self.gas = self.create_swiss_cheese_gas(gasconverter)
         else:
             self.gas = np.load("./data/initgas.npy", allow_pickle=True)[0]
+            print("Loaded == True")
 
         if not self.load:
             np.save("./data/initgas.npy", [self.gas])
             np.save("./data/initbodies.npy", [self.bodies])
-            addasdas
+            
             
 
         
@@ -94,6 +95,7 @@ class Clustersimulation:
         }
 
     def hydrocode(self, gravconverter):
+        print("Hydrocode")
         '''Create a hydro code and a gas distribution and put the gas in the hydro code.'''
         self.hydro = Fi(gravconverter, mode='g6lib')
         self.hydro.parameters.gamma = 1
@@ -108,6 +110,7 @@ class Clustersimulation:
         self.hydro.particles.add_particles(self.gas)
 
     def bridge(self):
+        print("Bridge")
         '''Bridge the codes.'''
         gravhydro = bridge.Bridge(use_threading=False) #, method=SPLIT_4TH_S_M4)
         gravhydro.add_system(self.gravity, (self.hydro,))
@@ -116,21 +119,25 @@ class Clustersimulation:
         return gravhydro
 
     def stellar_evolution(self):
+        print("Stellar_evolution")
         ''' Create stellar evolution.'''
         self.evolution = SeBa()
         self.evolution.particles.add_particles(self.bodies)
 
 
     def stellar_wind(self):
+        print("Stellar_wind")
         '''Create Stellar wind.'''
         # p. 223
+        print(np.sum(self.gas.mass)) # 1.0 kg
         mgas = np.sum(self.gas.mass)/self.n_gas
         self.wind = new_stellar_wind(
-            mgas/10000, target_gas=self.gas, timestep=self.dt_winds, derive_from_evolution=True
+            mgas/100, target_gas=self.gas, timestep=self.dt_winds, derive_from_evolution=True   # stond eerste mgas/10000
         )
         self.wind.particles.add_particles(self.bodies)
 
     def init_stars(self, alpha_IMF=-2.35):
+        print("init_stars")
         '''Create stars with masses, positions and velocities and put them in the ph4 module.'''
         while True:
             m_stars = new_salpeter_mass_distribution(
@@ -159,6 +166,7 @@ class Clustersimulation:
         return gravconverter
 
     def create_swiss_cheese_gas(self, gasconverter):
+        print("Kaas!")
         """Create Swiss cheese holes in a gas according to a star distribution.
 
         Removes gas around the position of stars where the mass of the removed gas
@@ -193,6 +201,7 @@ class Clustersimulation:
         return gas
 
     def gravity_hydro_bridge(self):
+        print("grav_hydro_bridge")
         '''Run the simulation.'''
         t_steps = np.arange(0, self.t_end.value_in(units.Myr), self.dt.value_in(units.Myr)) | units.Myr
 
@@ -207,9 +216,9 @@ class Clustersimulation:
         gascount_at_SN = len(self.gas)
 
         for timestamp in tqdm(t_steps):
-            
+            print("Before simulate_timestamp:", len(self.gas))
             self.simulate_timestamp(timestamp)
-
+            print("After simulate_timestamp:", len(self.gas))
             for i in range(1, len(self.gas)):
                 if original_gas[-i].key in self.gas.key:
                     gas_indices.append(np.argwhere(self.gas.key == original_gas[-i].key)[0][0])
@@ -247,26 +256,59 @@ class Clustersimulation:
 
 
     def simulate_timestamp(self, timestamp):
+        print("simulate_timestamp")
         '''Run the simulating to the given timestamp.'''
         if self.evostars:
-            self.evolution.evolve_model(timestamp - self.settle_time)
+            self.evolution.evolve_model(timestamp)# - self.settle_time)
+            print("1")
         self.channel["evo_to_grav"].copy()
+        print("2")
         self.channel["evo_to_stars"].copy()
+        print("3")
         self.channel["stars_to_wind"].copy()      # wind with hydro and grav: Book 8.1.1 p.323
+        print("4")
         self.wind.evolve_model(timestamp)
+"""
+De code crasht hier. Error:
+  File "/software/amuse/amuse-2021.6/lib/python3.9/site-packages/amuse/ext/stellar_wind.py", line 472, in create_wind_particles_for_one_star
+    wind = self.wind_sphere(star, Ngas)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/software/amuse/amuse-2021.6/lib/python3.9/site-packages/amuse/ext/stellar_wind.py", line 445, in wind_sphere
+    wind = Particles(Ngas)
+           ^^^^^^^^^^^^^^^
+  File "/software/amuse/amuse-2021.6/lib/python3.9/site-packages/amuse/datamodel/particles.py", line 1152, in __init__
+    particle_keys = keys_generator.next_set_of_keys(size)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/software/amuse/amuse-2021.6/lib/python3.9/site-packages/amuse/datamodel/base.py", line 79, in next_set_of_keys
+    return numpy.array([random.getrandbits(self.number_of_bits) for i in range(length)], dtype='uint64')
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/software/amuse/amuse-2021.6/lib/python3.9/site-packages/amuse/datamodel/base.py", line 79, in <listcomp>
+    return numpy.array([random.getrandbits(self.number_of_bits) for i in range(length)], dtype='uint64')
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Is er iets gebeurd met de size van de winddeeltjes ofzo? Of iets anders bijzonders met de hoeveelheid?
+
+"""
+        print("5")
         self.gas = delete_outofbounds(self.gas)
+        print("6")
         self.gas.synchronize_to(self.hydro.particles)
+        print("7")
         self.gravhydro.evolve_model(timestamp)
+        print("8")
         self.channel["to_stars"].copy()
+        print("9")
         self.channel["to_gas"].copy()
 
 
 
 def star_control(bodies):
+    print("star_control")
     bodies_pd = pd.DataFrame(np.array(bodies.stellar_type.number), columns=["stellar_type"])
     return list(bodies_pd.value_counts().index[-1])[0]
 
 def delete_outofbounds(gas):
+    print("delete_outofbounds")
     '''Delete all the gas that is out of bounds.'''
     mask = gas.position.lengths() >= 1e18|units.m #1e18m is 30 parsec
     selection = gas[mask]
@@ -290,6 +332,7 @@ def print_info(gravity_initial_total_energy, gravity, hydro, gas, i, start_mass,
 
 
 def main(gasmass, run):
+    print("main")
     '''Run the simulation with standard parameters.'''
     my_simulation = Clustersimulation(gasmass, run)
     my_simulation.gravity_hydro_bridge()

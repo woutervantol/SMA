@@ -72,11 +72,12 @@ class Clustersimulation:
             self.gas = self.create_swiss_cheese_gas(gasconverter)
         else:
             self.gas = np.load("./data/initgas.npy", allow_pickle=True)[0]
+            print("Loaded == True")
 
         if not self.load:
             np.save("./data/initgas.npy", [self.gas])
             np.save("./data/initbodies.npy", [self.bodies])
-            addasdas
+            
             
 
         
@@ -100,6 +101,7 @@ class Clustersimulation:
         }
 
     def hydrocode(self, gravconverter):
+        print("Hydrocode")
         '''Create a hydro code and a gas distribution and put the gas in the hydro code.'''
         self.hydro = Fi(gravconverter, mode='g6lib')
         self.hydro.parameters.gamma = 1
@@ -114,6 +116,7 @@ class Clustersimulation:
         self.hydro.particles.add_particles(self.gas)
 
     def bridge(self):
+        print("Bridge")
         '''Bridge the codes.'''
         gravhydro = bridge.Bridge(use_threading=False) #, method=SPLIT_4TH_S_M4)
         gravhydro.add_system(self.gravity, (self.hydro,))
@@ -122,14 +125,17 @@ class Clustersimulation:
         return gravhydro
 
     def stellar_evolution(self):
+        print("Stellar_evolution")
         ''' Create stellar evolution.'''
         self.evolution = SeBa()
         self.evolution.particles.add_particles(self.bodies)
 
 
     def stellar_wind(self):
+        print("Stellar_wind")
         '''Create Stellar wind.'''
         # p. 223
+        print(np.sum(self.gas.mass)) # 1.0 kg
         mgas = np.sum(self.gas.mass)/self.n_gas
         self.wind = new_stellar_wind(
             self.windsgasmass, target_gas=self.gas, timestep=self.dt_winds, derive_from_evolution=True
@@ -137,6 +143,7 @@ class Clustersimulation:
         self.wind.particles.add_particles(self.bodies)
 
     def init_stars(self, alpha_IMF=-2.35):
+        print("init_stars")
         '''Create stars with masses, positions and velocities and put them in the ph4 module.'''
         while True:
             m_stars = new_salpeter_mass_distribution(
@@ -165,6 +172,7 @@ class Clustersimulation:
         return gravconverter
 
     def create_swiss_cheese_gas(self, gasconverter):
+        print("Kaas!")
         """Create Swiss cheese holes in a gas according to a star distribution.
 
         Removes gas around the position of stars where the mass of the removed gas
@@ -199,6 +207,7 @@ class Clustersimulation:
         return gas
 
     def gravity_hydro_bridge(self):
+        print("grav_hydro_bridge")
         '''Run the simulation.'''
         t_steps = np.arange(0, self.t_end.value_in(units.Myr), self.dt.value_in(units.Myr)) | units.Myr
 
@@ -213,9 +222,9 @@ class Clustersimulation:
         gascount_at_SN = len(self.gas)
 
         for timestamp in tqdm(t_steps):
-            
+            print("Before simulate_timestamp:", len(self.gas))
             self.simulate_timestamp(timestamp)
-
+            print("After simulate_timestamp:", len(self.gas))
             for i in range(1, len(self.gas)):
                 if original_gas[-i].key in self.gas.key:
                     gas_indices.append(np.argwhere(self.gas.key == original_gas[-i].key)[0][0])
@@ -258,7 +267,7 @@ class Clustersimulation:
     def simulate_timestamp(self, timestamp):
         '''Run the simulating to the given timestamp.'''
         if self.evostars:
-            self.evolution.evolve_model(timestamp - self.settle_time)
+            self.evolution.evolve_model(timestamp)# - self.settle_time)
         self.channel["evo_to_grav"].copy()
         self.channel["evo_to_stars"].copy()
         self.channel["stars_to_wind"].copy()      # wind with hydro and grav: Book 8.1.1 p.323
@@ -275,10 +284,12 @@ class Clustersimulation:
 
 
 def star_control(bodies):
+    print("star_control")
     bodies_pd = pd.DataFrame(np.array(bodies.stellar_type.number), columns=["stellar_type"])
     return list(bodies_pd.value_counts().index[-1])[0]
 
 def delete_outofbounds(gas):
+    print("delete_outofbounds")
     '''Delete all the gas that is out of bounds.'''
     mask = gas.position.lengths() >= 1e18|units.m #1e18m is 30 parsec
     selection = gas[mask]
@@ -302,6 +313,7 @@ def print_info(gravity_initial_total_energy, gravity, hydro, gas, i, start_mass,
 
 
 def main(gasmass, run):
+    print("main")
     '''Run the simulation with standard parameters.'''
     my_simulation = Clustersimulation(gasmass, run)
     my_simulation.gravity_hydro_bridge()

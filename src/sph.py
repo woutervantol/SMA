@@ -26,8 +26,8 @@ from amuse.ext.molecular_cloud import molecular_cloud
 # np.random.seed(1)
 
 
-# dist = 0.2 | units.parsec
-# speed = 200 | units.kms
+# dist = 30 | units.parsec
+# speed = 80 | units.kms
 # time = dist/speed
 # print(time.value_in(units.Myr))
 # dasdas
@@ -55,17 +55,19 @@ class Clustersimulation:
         self.dt = 0.001 | units.Myr
         self.dt_winds = 0.001 | units.Myr
         self.dt_hydro = 0.001 | units.Myr
-        self.dt_bridge = 0.002 | units.Myr  #1.0*Pinner
+        self.dt_bridge = 0.001 | units.Myr  #1.0*Pinner
         # self.dt_SN = 0.01 | units.Myr
+        self.supernovagasmass = (1|units.MSun)/100
+        self.windsgasmass = (1|units.MSun)/10000
         self.n_stars = 10
         self.n_gas = 100
         self.r_cluster = 1.0 | units.parsec
-        self.t_end = 10.0 | units.Myr
-        self.settle_time = self.t_end - (10.0|units.Myr)
+        self.t_end = 0.2 | units.Myr
+        self.settle_time = self.t_end - (0.2|units.Myr)
 
         gravconverter = self.init_stars()
         ## Maak gasdeeltjes
-        gasconverter=nbody_system.nbody_to_si(1|units.kg, self.r_cluster*2)
+        gasconverter=nbody_system.nbody_to_si((gasmass+1)*self.total_mass, self.r_cluster*2)
         if not self.load:
             self.gas = self.create_swiss_cheese_gas(gasconverter)
         else:
@@ -82,7 +84,11 @@ class Clustersimulation:
         self.gravhydro = self.bridge()
         self.stellar_evolution()
         self.stellar_wind()
-
+        print(dir(self.wind))
+        print(self.wind.r_max)
+        print(self.gas.set_initial_wind_velocity((100|units.kms)))
+        self.gas.set_initial_wind_velocity((100|units.kms))
+        
         self.channel = {
             "from_stars": self.bodies.new_channel_to(self.gravity.particles),
             "to_stars": self.gravity.particles.new_channel_to(self.bodies),
@@ -126,7 +132,7 @@ class Clustersimulation:
         # p. 223
         mgas = np.sum(self.gas.mass)/self.n_gas
         self.wind = new_stellar_wind(
-            mgas/10000, target_gas=self.gas, timestep=self.dt_winds, derive_from_evolution=True
+            self.windsgasmass, target_gas=self.gas, timestep=self.dt_winds, derive_from_evolution=True
         )
         self.wind.particles.add_particles(self.bodies)
 
@@ -221,13 +227,16 @@ class Clustersimulation:
 
 
             #als het aantal deeltjes stijgt totdat het onder het originele niveau
-            if len(self.gas) > last_gascount or len(self.gas) > gascount_at_SN:
-                self.hydro.parameters.timestep = self.dt_hydro / 10
-                self.gravhydro.timestep = self.dt_bridge / 10
+            # if len(self.gas) > last_gascount or len(self.gas) > gascount_at_SN:
+            if star_control(self.bodies) == 4:#if core helium burning starts
+                # self.hydro.parameters.timestep = self.dt_hydro
+                # self.gravhydro.timestep = self.dt_bridge
+                self.wind.sph_particle_mass = self.supernovagasmass
             else:
-                self.hydro.parameters.timestep = self.dt_hydro
-                self.gravhydro.timestep = self.dt_bridge
-                gascount_at_SN = len(self.gas)
+                # self.hydro.parameters.timestep = self.dt_hydro
+                # self.gravhydro.timestep = self.dt_bridge
+                self.wind.sph_particle_mass = self.windsgasmass
+                # gascount_at_SN = len(self.gas)
 
             if timestamp > self.settle_time:
                 self.evostars = True
@@ -254,6 +263,9 @@ class Clustersimulation:
         self.channel["evo_to_stars"].copy()
         self.channel["stars_to_wind"].copy()      # wind with hydro and grav: Book 8.1.1 p.323
         self.wind.evolve_model(timestamp)
+        print(len(self.gas))
+        print(self.gas[-3:].velocity.lengths())
+        print(self.gas[-3:].position.lengths().value_in(units.parsec))
         self.gas = delete_outofbounds(self.gas)
         self.gas.synchronize_to(self.hydro.particles)
         self.gravhydro.evolve_model(timestamp)

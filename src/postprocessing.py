@@ -106,20 +106,28 @@ gascomp = np.load("./data/gas{}.npy".format(filestringcomp), allow_pickle=True)
 bodiescomp = np.load("./data/bodies{}.npy".format(filestringcomp), allow_pickle=True)
 
 
-    
+
 
 times = np.load("./data/times{}.npy".format(filestring), allow_pickle=True)
 gas_indices = np.load("./data/gas_indices{}.npy".format(filestring), allow_pickle=True)
+
+# for i in range(200):
+#     print(gas[i][gas_indices[i]+1:].position.lengths().value_in(units.parsec))
+#     print(gas[i][gas_indices[i]+1:].velocity.lengths())
+
 for i in range(len(times)):
     times[i] = times[i].value_in(units.Myr)
 
-#find time at which supernova starts
+# find time at which supernova starts
 SNtime = 0 | units.Myr
 for i in range(1, len(times)):
     # print(len(gas[i]), times[i])
     if len(gas[i]) > len(gas[i-1]):
         SNtime = times[i]
-        # break
+        print(gas[i][-10:].velocity.lengths())
+        print(gas[i][-10:].position.lengths().value_in(units.parsec))
+        print(gas[i][-10:].mass.value_in(units.MSun))
+        break
 print(SNtime)
 
 def plot_avg_velocities():
@@ -194,27 +202,26 @@ def plot_energies():
 
 def make_animation(frame):
     print(frame)
-    ax[0].cla()
-    ax[0].set_title("Time: {:.2f} Myr".format(times[frame]))
-    ax[0].set_xlim(-10, 10)
-    ax[0].set_ylim(-10, 10)
-    ax[0].set_xlabel("parsec")
-    ax[0].set_ylabel("parsec")
-    
-    ax[0].scatter(gas[frame].x[:gas_indices[frame]+1].value_in(units.parsec), gas[frame].y[:gas_indices[frame]+1].value_in(units.parsec), s=0.5, label="Gas", alpha=0.5)
-    ax[0].scatter(gas[frame].x[gas_indices[frame]+1:].value_in(units.parsec), gas[frame].y[gas_indices[frame]+1:].value_in(units.parsec), s=1, label="Supernova gas", color="yellow")
-    ax[0].scatter(bodies[frame].x.value_in(units.parsec), bodies[frame].y.value_in(units.parsec), s=3, label="Stars")
+    ax.cla()
+    ax.set_title("Time: {:.3f} Myr".format(times[frame]))
+    ax.set_xlim(-10, 10)
+    ax.set_ylim(-10, 10)
+    ax.set_xlabel("parsec")
+    ax.set_ylabel("parsec")
+    ax.scatter(gas[frame].x[:gas_indices[frame]+1].value_in(units.parsec), gas[frame].y[:gas_indices[frame]+1].value_in(units.parsec), s=0.5, label="Gas", alpha=0.5)
+    ax.scatter(gas[frame].x[gas_indices[frame]+1:].value_in(units.parsec), gas[frame].y[gas_indices[frame]+1:].value_in(units.parsec), s=1, label="Supernova gas", color="yellow")
+    ax.scatter(bodies[frame].x.value_in(units.parsec), bodies[frame].y.value_in(units.parsec), s=3, label="Stars")
     # if times[frame] >= SNtime:
     #     ax.scatter(bodies[frame][np.argmax(bodies[frame].mass)].x.value_in(units.parsec), bodies[frame][np.argmax(bodies[frame].mass)].y.value_in(units.parsec), s=10, c="red", label="Supernova")
     # ax.legend()
-    ax[1].cla()
-    ax[1].set_xlim(-10, 10)
-    ax[1].set_ylim(-10, 10)
-    ax[1].set_xlabel("parsec")
-    ax[1].set_ylabel("parsec")
+    # ax[1].cla()
+    # ax[1].set_xlim(-10, 10)
+    # ax[1].set_ylim(-10, 10)
+    # ax[1].set_xlabel("parsec")
+    # ax[1].set_ylabel("parsec")
 
-    ax[1].scatter(gascomp[frame].x.value_in(units.parsec), gascomp[frame].y.value_in(units.parsec), s=0.5, label="Gas", alpha=0.5)
-    ax[1].scatter(bodiescomp[frame].x.value_in(units.parsec), bodiescomp[frame].y.value_in(units.parsec), s=3, label="Stars")
+    # ax[1].scatter(gascomp[frame].x.value_in(units.parsec), gascomp[frame].y.value_in(units.parsec), s=0.5, label="Gas", alpha=0.5)
+    # ax[1].scatter(bodiescomp[frame].x.value_in(units.parsec), bodiescomp[frame].y.value_in(units.parsec), s=3, label="Stars")
     
 
 
@@ -222,7 +229,7 @@ def make_animation(frame):
 def make_columndensity(frame):
     print(frame)
     ax.cla()
-    ax.set_title("Time: {:.2f} Myr".format(times[frame]))
+    ax.set_title("Time: {:.3f} Myr".format(times[frame]))
     ax.set_xlim(-10, 10)
     ax.set_ylim(-10, 10)
     ax.set_xlabel("parsec")
@@ -232,12 +239,14 @@ def make_columndensity(frame):
     ax.scatter(bodies[frame].x.value_in(units.parsec), bodies[frame].y.value_in(units.parsec), s=3, label="Stars")
 
 
-# fig, ax = plt.subplots(2)
-# ax[0].set_box_aspect(1)
+fig, ax = plt.subplots()
+ax.set_box_aspect(1)
 # ax[1].set_box_aspect(1)
-# anim = animation.FuncAnimation(fig, make_animation, frames=len(times))
-# writer = animation.FFMpegWriter(fps=len(times)/20.)
-# anim.save("./figures/animation.mp4", writer=writer)
+# frames = int(np.linspace(0, 4000, 20*60))
+frames = np.arange(0, 200)
+anim = animation.FuncAnimation(fig, make_animation, frames=frames)
+writer = animation.FFMpegWriter(fps=len(frames)/20.)
+anim.save("./figures/animation.mp4", writer=writer)
 
 # fig, ax = plt.subplots()
 # anim = animation.FuncAnimation(fig, make_columndensity, frames=len(times))

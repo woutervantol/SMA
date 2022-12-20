@@ -20,19 +20,10 @@ from amuse.couple import bridge
 from amuse.ext.salpeter import new_salpeter_mass_distribution
 from amuse.ext.stellar_wind import new_stellar_wind
 from amuse.lab import new_plummer_gas_model
-from amuse.units import (units, nbody_system)
+from amuse.units import (units, nbody_system, constants)
 from amuse.ext.molecular_cloud import molecular_cloud
 
-# np.random.seed(1)
-
-
-# dist = 30 | units.parsec
-# speed = 80 | units.kms
-# time = dist/speed
-# print(time.value_in(units.Myr))
-# dasdas
-
-
+#file management
 def fix_cwd():
     """Make sure the script is running from the main project folder."""
     folder = getcwd().split("/")[-1]
@@ -45,55 +36,46 @@ def fix_cwd():
 
 
 class Clustersimulation:
-    """Simulation class."""
-
     def __init__(self, gasmass, run):
-        self.load = True
-        self.evostars = False
-        self.gasmass = gasmass
+        self.load = True #set False to create initial system or True to load last used system
+        self.gasmass = gasmass #ratio between mass in gas and mass in stars
         self.run = run
-        self.dt = 0.001 | units.Myr
-        self.dt_winds = 0.001 | units.Myr
+        self.dt = 0.002 | units.Myr
+        self.dt_winds = 0.002 | units.Myr
         self.dt_hydro = 0.001 | units.Myr
-        self.dt_bridge = 0.001 | units.Myr  #1.0*Pinner
-        # self.dt_SN = 0.01 | units.Myr
-        self.supernovagasmass = (1|units.MSun)/100
+        self.dt_bridge = 0.002 | units.Myr  #1.0*Pinner
+        self.supernovagasmass = (1|units.MSun)/10
         self.windsgasmass = (1|units.MSun)/10000
         self.n_stars = 10
         self.n_gas = 100
         self.r_cluster = 1.0 | units.parsec
-        self.t_end = 0.2 | units.Myr
-        self.settle_time = self.t_end - (0.2|units.Myr)
+        self.t_end = 10 | units.Myr
+        self.settle_time = self.t_end - (10|units.Myr)
 
+        #Create stars and gas
         gravconverter = self.init_stars()
-        ## Maak gasdeeltjes
-        gasconverter=nbody_system.nbody_to_si((gasmass+1)*self.total_mass, self.r_cluster*2)
+        gasconverter = nbody_system.nbody_to_si((gasmass+1)*self.total_mass, self.r_cluster*2)
         if not self.load:
             self.gas = self.create_swiss_cheese_gas(gasconverter)
         else:
             self.gas = np.load("./data/initgas.npy", allow_pickle=True)[0]
-            print("Loaded == True")
+        self.initialised_gas = self.gas.key.copy() #used to keep track of newly formed gas, so we can change their position and velocity by hand
 
+        #Create new initial system and close program
         if not self.load:
             np.save("./data/initgas.npy", [self.gas])
             np.save("./data/initbodies.npy", [self.bodies])
-            
-            
-
+            sys.exit()
         
+        #initialise all codes
         self.hydrocode(gravconverter)
-        self.gravhydro = self.bridge()
         self.stellar_evolution()
         self.stellar_wind()
-        print(dir(self.wind))
-        print(self.wind.r_max)
-        print(self.gas.set_initial_wind_velocity((100|units.kms)))
-        self.gas.set_initial_wind_velocity((100|units.kms))
-        
+        self.gravhydro = self.bridge()
+
+        #Set all needed channels
         self.channel = {
-            "from_stars": self.bodies.new_channel_to(self.gravity.particles),
             "to_stars": self.gravity.particles.new_channel_to(self.bodies),
-            "from_gas": self.gas.new_channel_to(self.hydro.particles),
             "to_gas": self.hydro.particles.new_channel_to(self.gas),
             "evo_to_grav": self.evolution.particles.new_channel_to(self.gravity.particles),
             "evo_to_stars": self.evolution.particles.new_channel_to(self.bodies),
@@ -101,8 +83,7 @@ class Clustersimulation:
         }
 
     def hydrocode(self, gravconverter):
-        print("Hydrocode")
-        '''Create a hydro code and a gas distribution and put the gas in the hydro code.'''
+        #Create a hydro code and a gas distribution and put the gas in the hydro code. Parameter values are taken from tutorial
         self.hydro = Fi(gravconverter, mode='g6lib')
         self.hydro.parameters.gamma = 1
         self.hydro.parameters.isothermal_flag = True
@@ -113,38 +94,31 @@ class Clustersimulation:
         eps = 0.1 | units.au
         self.hydro.parameters.gas_epsilon = eps
         self.hydro.parameters.sph_h_const = eps
+
         self.hydro.particles.add_particles(self.gas)
 
     def bridge(self):
-        print("Bridge")
-        '''Bridge the codes.'''
-        gravhydro = bridge.Bridge(use_threading=False) #, method=SPLIT_4TH_S_M4)
+        #Bridge gravity and hydro codes
+        gravhydro = bridge.Bridge(use_threading=False)
         gravhydro.add_system(self.gravity, (self.hydro,))
         gravhydro.add_system(self.hydro, (self.gravity,))
-        gravhydro.timestep = self.dt_bridge # min 2x de output timestep
+        gravhydro.timestep = self.dt_bridge
         return gravhydro
 
     def stellar_evolution(self):
-        print("Stellar_evolution")
-        ''' Create stellar evolution.'''
+        #Start SeBa code
         self.evolution = SeBa()
         self.evolution.particles.add_particles(self.bodies)
 
 
     def stellar_wind(self):
-        print("Stellar_wind")
-        '''Create Stellar wind.'''
-        # p. 223
-        print(np.sum(self.gas.mass)) # 1.0 kg
-        mgas = np.sum(self.gas.mass)/self.n_gas
-        self.wind = new_stellar_wind(
-            self.windsgasmass, target_gas=self.gas, timestep=self.dt_winds, derive_from_evolution=True
-        )
+        # Start stellar wind code
+        # See p. 223
+        self.wind = new_stellar_wind(self.windsgasmass, target_gas=self.gas, timestep=self.dt_winds, derive_from_evolution=True)
         self.wind.particles.add_particles(self.bodies)
 
     def init_stars(self, alpha_IMF=-2.35):
-        print("init_stars")
-        '''Create stars with masses, positions and velocities and put them in the ph4 module.'''
+        #Create a mass Salpeter mass distribution. If it doesn't fit our criteria, reroll the distribution until it does (largest star between 27 and 33 MSun and second largest smaller)
         while True:
             m_stars = new_salpeter_mass_distribution(
                 self.n_stars, 0.1|units.MSun, 100|units.MSun, alpha_IMF
@@ -154,7 +128,8 @@ class Clustersimulation:
 
             if heaviest_stars[0] > 27 and heaviest_stars[0] < 33 and heaviest_stars[1] < 27:
                 break
-        print("max mass star:", m_stars[np.argmax(m_stars)])
+        
+        #Create stars or load stars and put them in the ph4 module. 
         if not self.load:
             self.total_mass = np.sum(m_stars)
             gravconverter=nbody_system.nbody_to_si(self.total_mass, self.r_cluster)
@@ -166,35 +141,16 @@ class Clustersimulation:
             self.total_mass = np.sum(self.bodies.mass)
             gravconverter=nbody_system.nbody_to_si(self.total_mass, self.r_cluster)
         
-        
+        #Start ph4 and return the converter since the hydro code needs it
         self.gravity = ph4(gravconverter)
         self.gravity.particles.add_particles(self.bodies)
         return gravconverter
 
     def create_swiss_cheese_gas(self, gasconverter):
-        print("Kaas!")
-        """Create Swiss cheese holes in a gas according to a star distribution.
-
-        Removes gas around the position of stars where the mass of the removed gas
-        equals the mass of the star. This results in a gas distribution with holes
-        or a Swiss cheese like distribution.
-
-        Parameters
-        ----------
-        initial_gas
-            The initial gas distribution in where the holes will be cut into.
-        stars
-            The distribution of stars used to remove gas from the initial gas
-            distribution.
-
-        Returns
-        -------
-        newgas
-            The new swiss cheese gas distribution.
-        """
-        # gas = new_plummer_gas_model(self.n_gas, convert_nbody=gasconverter)
+        # Create uniform cloud of gas with random velocities. Remove gas around the stars with mass similar to the mass of the star.
         gas = molecular_cloud(targetN=self.n_gas, convert_nbody=gasconverter).result
 
+        # Try for a number of radii if the mass of the gas within this radius is similar to the mass of the star
         tryradii = np.logspace(np.log10(0.001), np.log10(1), 50) | units.parsec
         sorted_stars = np.sort(self.bodies.mass)
         for m_star in sorted_stars:
@@ -207,57 +163,36 @@ class Clustersimulation:
         return gas
 
     def gravity_hydro_bridge(self):
-        print("grav_hydro_bridge")
-        '''Run the simulation.'''
+        #Run simulation
         t_steps = np.arange(0, self.t_end.value_in(units.Myr), self.dt.value_in(units.Myr)) | units.Myr
 
-        original_gas = self.gas.copy()
+        original_gas = self.gas.copy() #used to distinguish the border between original gas and stellar wind gas throughout the simulation
         
         gaslist = []
         bodieslist = []
         timeslist = []
         gas_indices = []
 
-        last_gascount = len(self.gas)
-        gascount_at_SN = len(self.gas)
-
         for timestamp in tqdm(t_steps):
-            print("Before simulate_timestamp:", len(self.gas))
+            # Evolve all codes
             self.simulate_timestamp(timestamp)
-            print("After simulate_timestamp:", len(self.gas))
+
+            # Find border between original gas and stellar wind gas
             for i in range(1, len(self.gas)):
                 if original_gas[-i].key in self.gas.key:
                     gas_indices.append(np.argwhere(self.gas.key == original_gas[-i].key)[0][0])
                     break
 
+            # Save data
             gaslist.append(self.gas.copy())
             bodieslist.append(self.bodies.copy())
             timeslist.append(timestamp)
-
-
-            #als het aantal deeltjes stijgt totdat het onder het originele niveau
-            # if len(self.gas) > last_gascount or len(self.gas) > gascount_at_SN:
-            if star_control(self.bodies) == 4:#if core helium burning starts
-                # self.hydro.parameters.timestep = self.dt_hydro
-                # self.gravhydro.timestep = self.dt_bridge
-                self.wind.sph_particle_mass = self.supernovagasmass
-            else:
-                # self.hydro.parameters.timestep = self.dt_hydro
-                # self.gravhydro.timestep = self.dt_bridge
-                self.wind.sph_particle_mass = self.windsgasmass
-                # gascount_at_SN = len(self.gas)
-
-            if timestamp > self.settle_time:
-                self.evostars = True
-
-            last_gascount = len(self.gas)
 
         self.evolution.stop()
         self.gravity.stop()
         self.hydro.stop()
 
         filestring = "_ratio{}_run{}".format(self.gasmass, self.run)
-
         np.save("./data/gas{}.npy".format(filestring), gaslist)
         np.save("./data/bodies{}.npy".format(filestring), bodieslist)
         np.save("./data/times{}.npy".format(filestring), timeslist)
@@ -265,39 +200,55 @@ class Clustersimulation:
 
 
     def simulate_timestamp(self, timestamp):
-        '''Run the simulating to the given timestamp.'''
-        if self.evostars:
-            self.evolution.evolve_model(timestamp)# - self.settle_time)
+        # Evolve all codes
+        if timestamp >= self.settle_time:
+            self.evolution.evolve_model(timestamp - self.settle_time) # start evolving after settle time
         self.channel["evo_to_grav"].copy()
         self.channel["evo_to_stars"].copy()
         self.channel["stars_to_wind"].copy()      # wind with hydro and grav: Book 8.1.1 p.323
-        self.wind.evolve_model(timestamp)
+        
+        # From supernova onwards we want to increase the mass per particle or else we get millions of particles at the supernova
+        if star_control(self.bodies) == 4 or star_control(self.bodies) == 14 or star_control(self.bodies) == 5:
+            self.wind.sph_particle_mass = self.supernovagasmass
+        else:
+            self.wind.sph_particle_mass = self.windsgasmass
+        # self.wind.evolve_model(timestamp)
         print(len(self.gas))
-        print(self.gas[-3:].velocity.lengths())
-        print(self.gas[-3:].position.lengths().value_in(units.parsec))
+        self.wind_init()
         self.gas = delete_outofbounds(self.gas)
         self.gas.synchronize_to(self.hydro.particles)
         self.gravhydro.evolve_model(timestamp)
         self.channel["to_stars"].copy()
         self.channel["to_gas"].copy()
+    
+    def wind_init(self):
+        # Check which gas particles are newly created and initialise them by hand. We place them close to the star and change their velocity
+        bigstar = self.bodies[np.argmax(self.bodies.mass)]
+        for i in range(1, len(self.gas)):
+            if self.gas[-i].key not in self.initialised_gas:
+                self.gas[-i].position = bigstar.position + self.gas[-i].position/self.gas[-i].position.length() * (0.001|units.parsec)
+                self.gas[-i].velocity = self.gas[-i].velocity/self.gas[-i].velocity.length() * (100|units.kms)
+                self.initialised_gas = np.append(self.initialised_gas, self.gas[-i].key)
+            else:
+                break
 
 
 
 def star_control(bodies):
-    print("star_control")
+    # Return the evolutionary phase of the largest star. Used to see when it goes supernova
     bodies_pd = pd.DataFrame(np.array(bodies.stellar_type.number), columns=["stellar_type"])
     return list(bodies_pd.value_counts().index[-1])[0]
 
 def delete_outofbounds(gas):
-    print("delete_outofbounds")
-    '''Delete all the gas that is out of bounds.'''
-    mask = gas.position.lengths() >= 1e18|units.m #1e18m is 30 parsec
+    # Delete all the gas that is out of bounds.
+    mask = gas.position.lengths() >= 1e18|units.m #1e18m is around 30 parsec
     selection = gas[mask]
     gas.remove_particles(selection)
     return gas
 
 
 def print_info(gravity_initial_total_energy, gravity, hydro, gas, i, start_mass, bodies, t,):
+    # Used for debugging
     dE_gravity = gravity_initial_total_energy/(gravity.get_total_energy()+hydro.get_total_energy())
     print("dE:", dE_gravity, "; t=", t)
     current_gasmass = np.sum(gas.mass)
@@ -313,8 +264,7 @@ def print_info(gravity_initial_total_energy, gravity, hydro, gas, i, start_mass,
 
 
 def main(gasmass, run):
-    print("main")
-    '''Run the simulation with standard parameters.'''
+    # Run the simulation with standard parameters.
     my_simulation = Clustersimulation(gasmass, run)
     my_simulation.gravity_hydro_bridge()
     return 0
@@ -322,12 +272,7 @@ def main(gasmass, run):
 
 if __name__ == "__main__":
     fix_cwd()
-    # runs_per_gasmass = np.arange(0, 10)
-    # gas_mass_ratios = [5]
-    # for gasmass in gas_mass_ratios:
-    #     for run in runs_per_gasmass:
-    #         main(gasmass, "{}".format(run))
-    exit(main(5, "windtest"))
+    exit(main(5, "sketchy_final_comp"))
 
 
 # Interessant boek? https://misaladino.com/wp-content/uploads/2019/11/Thesis_Martha_Irene.pdf

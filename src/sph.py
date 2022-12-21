@@ -36,8 +36,8 @@ def fix_cwd():
 
 
 class Clustersimulation:
-    def __init__(self, gasmass, run):
-        self.load = True #set False to create initial system or True to load last used system
+    def __init__(self, gasmass, run, load=True):
+        self.load = load #set False to create initial system or True to load last used system
         self.gasmass = gasmass #ratio between mass in gas and mass in stars
         self.run = run
         self.dt = 0.002 | units.Myr
@@ -65,7 +65,7 @@ class Clustersimulation:
         if not self.load:
             np.save("./data/initgas.npy", [self.gas])
             np.save("./data/initbodies.npy", [self.bodies])
-            sys.exit()
+            return
         
         #initialise all codes
         self.hydrocode(gravconverter)
@@ -263,41 +263,18 @@ def print_info(gravity_initial_total_energy, gravity, hydro, gas, i, start_mass,
     print("Total mass:", np.sum(bodies.mass) | units.MSun)
 
 
-def main(gasmass, run):
+def main(gasmass, run, load=True):
     # Run the simulation with standard parameters.
-    my_simulation = Clustersimulation(gasmass, run)
-    my_simulation.gravity_hydro_bridge()
+    my_simulation = Clustersimulation(gasmass, run, load)
+    if load:
+        my_simulation.gravity_hydro_bridge()
     return 0
 
 
 if __name__ == "__main__":
     fix_cwd()
+    main(5, "sketchy_final_comp", False)
     exit(main(5, "sketchy_final_comp"))
-
-
-# Interessant boek? https://misaladino.com/wp-content/uploads/2019/11/Thesis_Martha_Irene.pdf
-
-#### Stellar types ####
-# "deeply or fully convective low mass MS star" #  0
-# "Main Sequence star"                          #  1
-# "Hertzsprung Gap"                             #  2
-# "First Giant Branch"                          #  3
-# "Core Helium Burning"                         #  4
-# "First Asymptotic Giant Branch"               #  5
-# "Second Asymptotic Giant Branch"              #  6
-# "Main Sequence Naked Helium star"             #  7
-# "Hertzsprung Gap Naked Helium star"           #  8
-# "Giant Branch Naked Helium star"              #  9
-# "Helium White Dwarf"                          # 10
-# "Carbon/Oxygen White Dwarf"                   # 11
-# "Oxygen/Neon White Dwarf"                     # 12
-# "Neutron Star"                                # 13
-# "Black Hole"                                  # 14
-# "Massless Supernova"                          # 15
-# "Unknown stellar type"                        # 16
-# "Pre-main-sequence Star"                      # 17
-# "Planet"                                      # 18
-# "Brown Dwarf"                                 # 19
 
 # 2 timesteps:
 # De bridge timestep (minimaal half van de output timestep)

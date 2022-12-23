@@ -20,6 +20,11 @@ The data visualisation script.
 Uses the data saved by `simulate.py` to create several images and/or animations.
 The command line argument `--run <name>` can be used to specify which data to use in the visualisation.
 
+## The Report
+The LaTeX files for the report can be found in the report directory.
+A pdf can be generated using the provided Makefile, by running `make all` from the report directory.
+To generate this pdf, `pdflatex` and `biber` should be installed.
+
 ---
 
 ## Minimum requirements

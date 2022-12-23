@@ -2,7 +2,8 @@
 ## How to run
 The source code consists of two files: simulate.py and postprocessing.py.
 The first runs the simulation and saves some datafiles, the second uses these files to visualise the results.
-The files should both be run from the main project folder e.g. `src/simulate.py` or `python3 src/simulate.py` if the script doesn't detect your python virtual environment automatically. To run the scripts please use an environment with the following packages installed:
+The files should both be run from the main project folder e.g. `src/simulate.py` (or `python3 src/simulate.py` if the script doesn't detect your python virtual environment automatically).
+To run the scripts please use an environment with the following packages installed:
 - Amuse
 - Matplotlib
 - Numpy
@@ -10,10 +11,16 @@ The files should both be run from the main project folder e.g. `src/simulate.py`
 - Tqdm
 
 ### simulate.py
-The main file for simulating an open cluster with stars and gas. When run without any command line arguments, the file will run a simple simulation containing 10 stars and 100 gas particles for demonstration purposes. By running `src/simulate.py --help` a promt will show up displaying the different command line arguments that can be passed down to alter the initial conditions of the simulation.
+The main file for simulating an open cluster with stars and gas.
+When run without any command line arguments, the file will run a simple simulation containing 10 stars and 100 gas particles for demonstration purposes.
+By running `src/simulate.py --help` a promt will show up displaying the different command line arguments that can be passed down to alter the initial conditions of the simulation.
 
 ### postprocessing.py
-The data visualisation script. Uses the data saved by `simulate.py` to create several images and/or animations. The command line argument `--run <name>` can be used to specify which data to use in the visualisation.
+The data visualisation script.
+Uses the data saved by `simulate.py` to create several images and/or animations.
+The command line argument `--run <name>` can be used to specify which data to use in the visualisation.
+
+---
 
 ## Minimum requirements
 Simulate a open cluster with the following points implemented:
@@ -52,12 +59,3 @@ Simulate a open cluster with the following points implemented:
 - Wouter van Tol (s2041340)
 - Rutger Rijnenberg (s1829777)
 
-<!--- take a mass function (salpeter) and 1000 stars, maybe 1 30 solar mass starr or tune such that we have at least 1 large star. Take a fractal distribution of stars since it is less bound and stable. Take gas plummer sphere around this distribution of stars. 
-As initial conditions eat away the gas around the stars proportional to the mass of the stars, like a swiss cheese. 
-we need star evolution, use SEBA, for extra points we can use MESA, use 10000 shp particles.
-One of our problems is the bridge timesteps after a supernova starts, then we can use 1000 or 10000 years timesteps.
-Make the most massive star 30 solar masses and change it to virial equilibrium.
-Is the gas blown away by the stellar winds or by the supernova?
-What is the contribution of the supernova to clearing the gas?
-present 14th december, deadline is 23rd of december
-see if the swiss cheese approach is realistic --->

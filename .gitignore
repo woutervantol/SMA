@@ -10,6 +10,7 @@
 # Python
 __pycache__/
 activate
+.coverage
 
 # Amuse
 _amuse_output_data/

@@ -6,6 +6,7 @@
 *.bbl
 *.log
 *.run.xml
+*.out
 
 # Python
 __pycache__/
@@ -15,7 +16,6 @@ activate
 # Amuse
 _amuse_output_data/
 
-figures/
-
 data/
 binev.data
+output.del

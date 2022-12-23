@@ -1,3 +1,10 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""Script used to create plots from output of the simulation.
+
+Authors: Rick Dullaart, Rutger Rijnenberg & Wouter van Tol
+Last edited: 2022-12-23
+"""
 import numpy as np
 import matplotlib.pyplot as plt
 from amuse.units import units
@@ -66,6 +73,23 @@ def plot_avg_positions():
     plt.plot(times, posscomp, label="Without wind")
     plt.legend()
     plt.savefig("./figures/avg_pos.png")
+
+def plot_initial_position():
+    bodies = np.load("data/initbodies.npy", allow_pickle=True)
+    bodies = bodies[0].position.value_in(units.parsec)
+    gas = np.load("data/initgas.npy", allow_pickle=True)
+    gas = gas[0].position.value_in(units.parsec)
+    plt.figure(figsize=(5,5))
+    plt.scatter(gas[:,0], gas[:, 1], label="Gas", s=1, alpha=0.5)
+    plt.scatter(bodies[:, 0], bodies[:, 1], label="Stars", s=4)
+    plt.xlabel("X position [parsec]")
+    plt.ylabel("Y position [parsec]")
+    plt.legend()
+    plt.axis('equal')
+    plt.tight_layout()
+    plt.savefig("figures/initial_position.png")
+    plt.show()
+
 
 def plot_energies():
     Us = []
@@ -167,7 +191,8 @@ def make_columndensity(frame):
 
 plot_avg_positions()
 plot_avg_velocities()
-# plot_energies()
+plot_initial_position()
+plot_energies()
 
 
 

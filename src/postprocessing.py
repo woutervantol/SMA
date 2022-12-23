@@ -5,21 +5,27 @@
 Authors: Rick Dullaart, Rutger Rijnenberg & Wouter van Tol
 Last edited: 2022-12-23
 """
+
+from argparse import ArgumentParser
 import numpy as np
 import matplotlib.pyplot as plt
 from amuse.units import units
 from matplotlib import animation
 import pandas as pd
 
+
+parser = ArgumentParser(description="Create plots from a specific simulation run.")
+parser.add_argument('--run', default="standard")
+args = parser.parse_args()
+
+
 def star_control(bods):
     bodies_pd = pd.DataFrame(np.array(bods.stellar_type.number), columns=["stellar_type"])
     return list(bodies_pd.value_counts().index[-1])[0]
 
 
-
-
-filestring = "_ratio{}_run{}".format(5, "sketchy_final")
-filestringcomp = "_ratio{}_run{}".format(5, "sketchy_final_comp")
+filestring = "_ratio{}_run{}".format(5, args.run)
+filestringcomp = "_ratio{}_run{}".format(5, args.run + "_comp")
 
 gas = np.load("./data/gas{}.npy".format(filestring), allow_pickle=True)
 bodies = np.load("./data/bodies{}.npy".format(filestring), allow_pickle=True)

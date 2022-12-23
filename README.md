@@ -1,4 +1,20 @@
 # Young Open Cluster Simulation
+## How to run
+The source code consists of two files: simulate.py and postprocessing.py.
+The first runs the simulation and saves some datafiles, the second uses these files to visualise the results.
+The files should both be run from the main project folder e.g. `src/simulate.py` or `python3 src/simulate.py` if the script doesn't detect your python virtual environment automatically. To run the scripts please use an environment with the following packages installed:
+- Amuse
+- Matplotlib
+- Numpy
+- Pandas
+- Tqdm
+
+### simulate.py
+The main file for simulating an open cluster with stars and gas. When run without any command line arguments, the file will run a simple simulation containing 10 stars and 100 gas particles for demonstration purposes. By running `src/simulate.py --help` a promt will show up displaying the different command line arguments that can be passed down to alter the initial conditions of the simulation.
+
+### postprocessing.py
+The data visualisation script. Uses the data saved by `simulate.py` to create several images and/or animations. The command line argument `--run <name>` can be used to specify which data to use in the visualisation.
+
 ## Minimum requirements
 Simulate a open cluster with the following points implemented:
 - Simulate the stars:
@@ -10,7 +26,7 @@ Simulate a open cluster with the following points implemented:
   - [x] Remove the gas around the stars (create a Swiss cheese), based on the mass of the stars.
 - Stellar winds and Supernovae:
   - [x] Add stellar evolution (SEBA)
-  - [x?] Implement stellar winds module
+  - [x] Implement stellar winds module
   - [x] Use 10000 sph particles
   - [ ] Time step 1kyr - 100kyr when the 30MSun star goes supernova
 - Cool stuff:
